@@ -1,6 +1,6 @@
 # prism-core
 A file utility
 
-WIP:
+WIP:  
 undo sort via JSON logging  
 beginning CLI support using argparse
