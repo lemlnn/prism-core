@@ -10,8 +10,8 @@ by Lemuel Lin
   * Safety:
     * Supports dry-run preview for organize and undo
     * Saves organize runs as JSON logs in .prism_logs
-    * Can undo the most recent run or a specific log
-    * Cleans up finished undo logs and updates incomplete ones
+    * Undo for the most recent run or a specific log
+    * Automatic cleanup/update of undo logs
   * CLI:
     * Command-based CLI interface via argparse with 3 commands and their respective flags
       * organize (`--dry-run`, `--sort-hidden`)
