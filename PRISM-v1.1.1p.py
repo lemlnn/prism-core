@@ -17,7 +17,7 @@ from datetime import datetime
 #endregion
 
 #region constants
-SCRIPT_VERSION = "1.1p"
+SCRIPT_VERSION = "1.1.1p"
 LOG_DIR_NAME = ".prism_logs"
 SCRIPT_NAME = Path(__file__).name
 FOLDER_PATH = Path(__file__).resolve().parent
@@ -116,7 +116,7 @@ def build_target_path(path: Path, folder: Path) -> Path:
     return target_path
 
 
-def organize_files(folder: Path, dry_run: bool, sort_hidden: bool) -> None:
+def organize_files(folder: Path, args) -> None:
     files = collect_top_level_files(folder)
 
     files_moved = 0
@@ -126,21 +126,24 @@ def organize_files(folder: Path, dry_run: bool, sort_hidden: bool) -> None:
 
     for path in files:
         target_path = build_target_path(path, folder)
-        if dry_run:
-            if is_hidden(path) == True and sort_hidden == False:
+
+        if args.exclude_str is not None and args.exclude_str in path.name:
+            continue
+        if args.dry_run:
+            if is_hidden(path) == True and args.sort_hidden == False:
                 print(f"[dry-run] {path.name} is hidden, skipping")
                 files_skipped += 1
                 continue
-            print(f"[dry-run] {path.name} -> {folder}/{target_path.name}")
+            print(f"[dry-run] {path.name} -> {target_path}")
             files_moved += 1
         else:
             try:
-                if is_hidden(path) == True and sort_hidden == False:
+                if is_hidden(path) == True and args.sort_hidden == False:
                     files_skipped += 1
                     continue
                 target_path.parent.mkdir(exist_ok=True)
                 shutil.move(str(path), str(target_path))
-                print(f"[success] Moved: {path.name} -> {folder}/{target_path.name}")
+                print(f"[success] Moved: {path.name} -> {target_path}")
                 files_moved += 1
                 move_log.append({ #logs the moves as the file runs
                     "original": str(path),
@@ -156,7 +159,7 @@ def organize_files(folder: Path, dry_run: bool, sort_hidden: bool) -> None:
                 print(f"[error] System reported {error_message}")
                 errors += 1
         
-    if not dry_run and move_log:
+    if not args.dry_run and move_log:
         log_path = create_log_path(folder)
         save_log(log_path, move_log)
         print(f"\n[log] Saved run log: {log_path}")
@@ -166,9 +169,10 @@ def organize_files(folder: Path, dry_run: bool, sort_hidden: bool) -> None:
     print(f"Total skipped: {files_skipped}")
     print(f"Total errors: {errors}")
 
-def undo_recent_organize(folder: Path, dry_run: bool, log_file: str | None) -> None:
-    if log_file:
-        log_path = folder / LOG_DIR_NAME / log_file
+def undo_recent_organize(folder: Path, args) -> None:
+
+    if args.log_file:
+        log_path = folder / LOG_DIR_NAME / args.log_file
         if not log_path.exists():
             print(f"[error] Log file not found: {log_path}")
             return
@@ -191,6 +195,10 @@ def undo_recent_organize(folder: Path, dry_run: bool, log_file: str | None) -> N
         original = Path(entry["original"])
         moved_to = Path(entry["moved_to"])
 
+        if args.exclude_str is not None and (
+            args.exclude_str in original.name or args.exclude_str in moved_to.name
+        ):
+            continue
         if not moved_to.exists():
             print(f"[skip] Missing moved file: {moved_to}")
             remaining_log.insert(0, entry)
@@ -199,7 +207,7 @@ def undo_recent_organize(folder: Path, dry_run: bool, log_file: str | None) -> N
         restore_target = get_unique_path(original)
 
         try:
-            if dry_run:
+            if args.dry_run:
                 print(f"[dry-run] Undo: {moved_to} -> {restore_target}")
             else:
                 # Recreate original parent folders if needed, then move back.
@@ -209,12 +217,12 @@ def undo_recent_organize(folder: Path, dry_run: bool, log_file: str | None) -> N
 
             undone += 1
 
-        except Exception as e:
-            print(f"[error] Could not undo {moved_to}: {e}")
+        except Exception as error:
+            print(f"[error] Could not undo {moved_to}: {error}")
             errors += 1
             remaining_log.insert(0, entry)
 
-    if not dry_run:
+    if not args.dry_run:
         if remaining_log:
             save_log(log_path, remaining_log)
             print(f"\n[log] Updated incomplete undo log: {log_path}")
@@ -222,8 +230,8 @@ def undo_recent_organize(folder: Path, dry_run: bool, log_file: str | None) -> N
             try:
                 log_path.unlink()
                 print(f"\n[log] Removed completed log: {log_path}")
-            except Exception as e:
-                print(f"[warn] Could not remove log file: {e}")
+            except Exception as error:
+                print(f"[warn] Could not remove log file: {error}")
 
     print("\nUndo complete!")
     print(f"Total undone: {undone}")
@@ -299,6 +307,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true", 
         help="Preview actions without moving files."
     )
+    shared_flags.add_argument(
+        "--exclude-str",
+        type=str,
+        help="Excludes a entry that contains the specified string"
+    )
 
     #commands
     organize_parser = subparsers.add_parser(
@@ -340,10 +353,10 @@ def main() -> None:
         return
     elif args.sub == "undo":
         print(f"Working in {FOLDER_PATH}")
-        undo_recent_organize(FOLDER_PATH, args.dry_run, args.log_file)
+        undo_recent_organize(FOLDER_PATH, args)
     elif args.sub == "organize":
         print(f"Working in {FOLDER_PATH}")
-        organize_files(FOLDER_PATH, args.dry_run, args.sort_hidden)
+        organize_files(FOLDER_PATH, args)
     else:
         print(f"No command provided. Try '{SCRIPT_NAME}.py organize' or use --help")
 
