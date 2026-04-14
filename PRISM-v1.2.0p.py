@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import sys
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from datetime import datetime
 
@@ -16,11 +16,7 @@ from datetime import datetime
 # - classes: PascalCase
 #endregion
 
-#region constants
-SCRIPT_VERSION = "1.1.1p"
-LOG_DIR_NAME = ".prism_logs"
-SCRIPT_NAME = Path(__file__).name
-FOLDER_PATH = Path(__file__).resolve().parent
+#region default-configs
 
 DEFAULT_FILE_TYPES = {
     "Images": [".jpg", ".jpeg", ".png", ".gif", ".tiff", ".bmp", ".eps", ".raw", ".heic", ".arw", ".webp"],
@@ -32,8 +28,34 @@ DEFAULT_FILE_TYPES = {
     "Applications": [".exe", ".dmg", ".app", ".msi", ".iso"],
     "Texts": [".txt", ".md", ".json", ".yaml", ".yml", ".xml"],
 }
-CATEGORY_FOLDERS = set(DEFAULT_FILE_TYPES.keys()) | {"Others"}
-#endregion
+
+@dataclass(frozen=True)
+class DefaultConfig:
+    script_name: str = Path(__file__).name
+    script_version: str = "1.2.0p"
+    log_dir_name: str = ".prism_logs"
+    folder_path: Path = Path(__file__).resolve().parent
+    config_dir_path: Path = Path.home() / ".prism_config"
+    dry_run: bool = False
+    sort_hidden: bool = False
+    exclude_str: str | None = None
+    default_file_types: dict[str, list[str]] = field(
+        default_factory=lambda: {k: v[:] for k, v in DEFAULT_FILE_TYPES.items()}
+    )
+
+@dataclass
+class RuntimeConfig:
+    script_name: str
+    script_version: str
+    log_dir_name: str
+    folder_path: Path
+    config_dir_path: Path
+    dry_run: bool
+    sort_hidden: bool
+    exclude_str: str | None
+    default_file_types: dict[str, list[str]]
+
+default_config = DefaultConfig()
 
 #region folder-indexing-functions
 
@@ -71,7 +93,7 @@ def collect_top_level_files(folder: Path) -> list[Path]:
     for entry in iterate_entries(folder):
         if get_entry_type(entry) != "file":
             continue
-        if entry.name == SCRIPT_NAME:
+        if entry.name == default_config.script_name:
             continue
         path = Path(entry.path)
         files.append(path)
@@ -95,8 +117,8 @@ def get_unique_path(target_path: Path) -> Path:
         counter += 1
 
 
-def get_target_folder(extension: str) -> str:
-    for folder_name, extensions in DEFAULT_FILE_TYPES.items():
+def get_target_folder(extension: str, file_types: dict[str, list[str]]) -> str:
+    for folder_name, extensions in file_types.items():
         if extension in extensions:
             return folder_name
     return "Others"
@@ -106,9 +128,13 @@ def get_extension(path: Path) -> str:
     return path.suffix.lower()
 
 
-def build_target_path(path: Path, folder: Path) -> Path:
+def build_target_path(
+    path: Path,
+    folder: Path,
+    file_types: dict[str, list[str]]
+) -> Path:
     extension = get_extension(path)
-    folder_name = get_target_folder(extension)
+    folder_name = get_target_folder(extension, file_types)
     target_path = folder / folder_name / path.name
 
     if target_path.exists():
@@ -116,7 +142,8 @@ def build_target_path(path: Path, folder: Path) -> Path:
     return target_path
 
 
-def organize_files(folder: Path, args) -> None:
+
+def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
     files = collect_top_level_files(folder)
 
     files_moved = 0
@@ -125,12 +152,12 @@ def organize_files(folder: Path, args) -> None:
     move_log = []
 
     for path in files:
-        target_path = build_target_path(path, folder)
+        target_path = build_target_path(path, folder, runtime_config.default_file_types)
 
-        if args.exclude_str is not None and args.exclude_str in path.name:
+        if runtime_config.exclude_str is not None and runtime_config.exclude_str in path.name:
             continue
-        if args.dry_run:
-            if is_hidden(path) == True and args.sort_hidden == False:
+        if runtime_config.dry_run:
+            if is_hidden(path) == True and runtime_config.sort_hidden == False:
                 print(f"[dry-run] {path.name} is hidden, skipping")
                 files_skipped += 1
                 continue
@@ -138,14 +165,14 @@ def organize_files(folder: Path, args) -> None:
             files_moved += 1
         else:
             try:
-                if is_hidden(path) == True and args.sort_hidden == False:
+                if is_hidden(path) == True and runtime_config.sort_hidden == False:
                     files_skipped += 1
                     continue
                 target_path.parent.mkdir(exist_ok=True)
                 shutil.move(str(path), str(target_path))
                 print(f"[success] Moved: {path.name} -> {target_path}")
                 files_moved += 1
-                move_log.append({ #logs the moves as the file runs
+                move_log.append({
                     "original": str(path),
                     "moved_to": str(target_path)
                 })
@@ -158,9 +185,9 @@ def organize_files(folder: Path, args) -> None:
             except OSError as error_message:
                 print(f"[error] System reported {error_message}")
                 errors += 1
-        
-    if not args.dry_run and move_log:
-        log_path = create_log_path(folder)
+
+    if not runtime_config.dry_run and move_log:
+        log_path = create_log_path(folder, runtime_config.log_dir_name)
         save_log(log_path, move_log)
         print(f"\n[log] Saved run log: {log_path}")
 
@@ -169,15 +196,15 @@ def organize_files(folder: Path, args) -> None:
     print(f"Total skipped: {files_skipped}")
     print(f"Total errors: {errors}")
 
-def undo_recent_organize(folder: Path, args) -> None:
+def undo_recent_organize(folder: Path, args, runtime_config: RuntimeConfig) -> None:
 
     if args.log_file:
-        log_path = folder / LOG_DIR_NAME / args.log_file
+        log_path = folder / runtime_config.log_dir_name / args.log_file
         if not log_path.exists():
             print(f"[error] Log file not found: {log_path}")
             return
     else:
-        log_path = get_latest_log(folder)
+        log_path = get_latest_log(folder, runtime_config.log_dir_name)
         if log_path is None:
             print("[info] No log files found. Nothing to undo.")
             return
@@ -195,8 +222,8 @@ def undo_recent_organize(folder: Path, args) -> None:
         original = Path(entry["original"])
         moved_to = Path(entry["moved_to"])
 
-        if args.exclude_str is not None and (
-            args.exclude_str in original.name or args.exclude_str in moved_to.name
+        if runtime_config.exclude_str is not None and (
+            runtime_config.exclude_str in original.name or runtime_config.exclude_str in moved_to.name
         ):
             continue
         if not moved_to.exists():
@@ -207,10 +234,9 @@ def undo_recent_organize(folder: Path, args) -> None:
         restore_target = get_unique_path(original)
 
         try:
-            if args.dry_run:
+            if runtime_config.dry_run:
                 print(f"[dry-run] Undo: {moved_to} -> {restore_target}")
             else:
-                # Recreate original parent folders if needed, then move back.
                 restore_target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(moved_to), str(restore_target))
                 print(f"[success] Undo: {moved_to.name} -> {restore_target}")
@@ -222,7 +248,7 @@ def undo_recent_organize(folder: Path, args) -> None:
             errors += 1
             remaining_log.insert(0, entry)
 
-    if not args.dry_run:
+    if not runtime_config.dry_run:
         if remaining_log:
             save_log(log_path, remaining_log)
             print(f"\n[log] Updated incomplete undo log: {log_path}")
@@ -236,18 +262,18 @@ def undo_recent_organize(folder: Path, args) -> None:
     print("\nUndo complete!")
     print(f"Total undone: {undone}")
     print(f"Total errors: {errors}")
-                
+
 #endregion
 
 #region logging-functions
 
-def check_log_dir(folder: Path) -> Path:
-    log_dir = folder / LOG_DIR_NAME
+def check_log_dir(folder: Path, log_dir_name: str) -> Path:
+    log_dir = folder / log_dir_name
     log_dir.mkdir(exist_ok=True)
     return log_dir
 
-def create_log_path(folder: Path) -> Path:
-    log_dir = check_log_dir(folder)
+def create_log_path(folder: Path, log_dir_name: str) -> Path:
+    log_dir = check_log_dir(folder, log_dir_name)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return log_dir / f"organize_log_{timestamp}.json"
 
@@ -263,21 +289,20 @@ def load_log(log_path: Path) -> list[dict]:
         with log_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, list) else []
-    except Exception as e:
-        print(f"[warn] Could not read log file: {e}")
+    except Exception as error:
+        print(f"[warn] Could not read log file: {error}")
         return []
 
-def get_latest_log(root: Path) -> Path | None:
-    log_dir = root / LOG_DIR_NAME
+def get_latest_log(root: Path, log_dir_name: str) -> Path | None:
+    log_dir = root / log_dir_name
     if not log_dir.exists():
         return None
 
     logs = sorted(log_dir.glob("organize_log_*.json"))
     return logs[-1] if logs else None
 
-def list_logs(folder_path: Path) -> None:
-
-    log_dir = folder_path / LOG_DIR_NAME
+def list_logs(folder_path: Path, log_dir_name: str) -> None:
+    log_dir = folder_path / log_dir_name
     if not log_dir.exists():
         print("[info] No log directory found.")
         return
@@ -293,6 +318,84 @@ def list_logs(folder_path: Path) -> None:
 
 #endregion
 
+#region config-functions
+
+def check_config_path(target_path: Path) -> Path:
+    if not target_path.exists():
+        return target_path
+    extension = target_path.suffix
+    while True:
+        input_target_name = input("[input] Config file name taken, try another? ").strip()
+
+        if not input_target_name:
+            print("[error] Config name cannot be empty.")
+            continue
+
+        if input_target_name.endswith(extension):
+            input_target_name = input_target_name.removesuffix(extension)
+        input_target_path = target_path.parent / f"{input_target_name}{extension}"
+
+        if not input_target_path.exists():
+            return input_target_path
+
+def get_config_file_path(config_dir: Path, name: str) -> Path:
+    config_dir.mkdir(parents=True, exist_ok=True)
+    target_path = config_dir / f"{name}.json"
+    return check_config_path(target_path)
+
+def serialize_default_config() -> dict:
+    data = asdict(default_config)
+    for key, value in data.items():
+        if isinstance(value, Path):
+            data[key] = str(value)
+    return data
+
+def write_default_config(config_path: Path) -> None:
+    with config_path.open("w", encoding="utf-8") as json_output:
+        json.dump(serialize_default_config(), json_output, indent=4)
+
+def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConfig:
+    loaded_config = loaded_config or {}
+
+    return RuntimeConfig(
+        script_name=loaded_config.get("script_name", default_config.script_name),
+        script_version=loaded_config.get("script_version", default_config.script_version),
+        log_dir_name=loaded_config.get("log_dir_name", default_config.log_dir_name),
+        folder_path=Path(loaded_config.get("folder_path", default_config.folder_path)),
+        config_dir_path=Path(loaded_config.get("config_dir_path", default_config.config_dir_path)),
+        dry_run=args.dry_run if args.dry_run is not None else loaded_config.get("dry_run", default_config.dry_run),
+        sort_hidden=args.sort_hidden if args.sort_hidden is not None else loaded_config.get("sort_hidden", default_config.sort_hidden),
+        exclude_str=args.exclude_str if args.exclude_str is not None else loaded_config.get("exclude_str", default_config.exclude_str),
+        default_file_types=loaded_config.get(
+            "default_file_types",
+            {k: v[:] for k, v in default_config.default_file_types.items()}
+        ),
+    )
+
+def serialize_config(runtime_config: RuntimeConfig) -> dict:
+    data = asdict(runtime_config)
+    for key, value in data.items():
+        if isinstance(value, Path):
+            data[key] = str(value)
+    return data
+
+def write_config(config_path: Path, runtime_config: RuntimeConfig) -> None:
+    with config_path.open("w", encoding="utf-8") as json_output:
+        json.dump(serialize_config(runtime_config), json_output, indent=4)
+
+def load_config(config_path: Path) -> dict:
+    try:
+        with config_path.open("r", encoding="utf-8") as json_input:
+            data = json.load(json_input)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception as error:
+        print(f"[warn] Could not read config file: {error}")
+        return {}
+
+#endregion
+
 #region args-functions
 
 def parse_args() -> argparse.Namespace:
@@ -303,8 +406,9 @@ def parse_args() -> argparse.Namespace:
 
     #shared flags
     shared_flags.add_argument(
-        "--dry-run", 
-        action="store_true", 
+        "--dry-run",
+        action="store_true",
+        default=None,
         help="Preview actions without moving files."
     )
     shared_flags.add_argument(
@@ -315,24 +419,29 @@ def parse_args() -> argparse.Namespace:
 
     #commands
     organize_parser = subparsers.add_parser(
-        "organize", 
-        parents=[shared_flags], 
+        "organize",
+        parents=[shared_flags],
         help="Runs the organizer script"
     )
     undo_parser = subparsers.add_parser(
         "undo",
-        parents=[shared_flags], 
+        parents=[shared_flags],
         help="Reverses the most recent organize run"
     )
     list_logs_parser = subparsers.add_parser(
-        "list-logs", 
+        "list-logs",
         help="List available run logs"
+    )
+    config_parser = subparsers.add_parser(
+        "config",
+        help="Config the settings, save/load configs"
     )
 
     #specific flags
     organize_parser.add_argument(
         "--sort-hidden",
         action="store_true",
+        default=None,
         help="Sorts hidden files."
     )
     undo_parser.add_argument(
@@ -344,21 +453,32 @@ def parse_args() -> argparse.Namespace:
 
 #endregion
 
+#region main
 def main() -> None:
-
     args = parse_args()
+    config_path = default_config.config_dir_path / "default.json"
+
+    loaded_config = load_config(config_path)
+    runtime_config = build_runtime_config(args, loaded_config)
 
     if args.sub == "list-logs":
-        list_logs(FOLDER_PATH)
+        list_logs(runtime_config.folder_path, runtime_config.log_dir_name)
         return
     elif args.sub == "undo":
-        print(f"Working in {FOLDER_PATH}")
-        undo_recent_organize(FOLDER_PATH, args)
+        print(f"Working in {runtime_config.folder_path}")
+        undo_recent_organize(runtime_config.folder_path, args, runtime_config)
     elif args.sub == "organize":
-        print(f"Working in {FOLDER_PATH}")
-        organize_files(FOLDER_PATH, args)
+        print(f"Working in {runtime_config.folder_path}")
+        organize_files(runtime_config.folder_path, runtime_config)
+    elif args.sub == "config":
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        if config_path.exists():
+            print(f"[info] Config already exists: {config_path}")
+        else:
+            write_default_config(config_path)
+            print(f"[success] Wrote default config: {config_path}")
     else:
-        print(f"No command provided. Try '{SCRIPT_NAME}.py organize' or use --help")
+        print(f"No command provided. Try '{runtime_config.script_name} organize' or use --help")
 
 
 if __name__ == "__main__":
