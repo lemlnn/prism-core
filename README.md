@@ -64,3 +64,5 @@ Special thanks to my Alpha testers and early contributors!
 * Early Contributors:
   * Enoch ([@Wavefire5201](https://github.com))
   * Gavin ([@dojozycknar10-player](https://github.com))
+ 
+This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
