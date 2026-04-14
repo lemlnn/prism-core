@@ -1,6 +1,6 @@
 # Changelog
   
-**PRISM [1.2.0p] (4/14/26)**  
+## PRISM [1.2.0p] (4/14/26)
   
 PRISM v1.2.0p was the first real config-system release, so far the biggest architectural update, and so far the hardest to implement as of now. It introduced DefaultConfig and RuntimeConfig, added support for loading persistent config from `~/.prism_config/default.json`, added a config command to initialize the default config file, and changed organize, undo, and logging behavior to run through a runtime config layer instead of only hardcoded defaults and CLI flags. It also updated file-type routing and log directory handling so they could be driven by runtime config, which moved PRISM from being a CLI-only tool into a config-aware system.
 
@@ -12,7 +12,7 @@ Changed
 - refactored organize, undo, and logging paths to use runtime config
 - reworked internal value flow to support future extensibility
   
-**PRISM [v1.1.1p] (4/13/26)**  
+## PRISM [v1.1.1p] (4/13/26)  
 
 PRISM v1.1.1p was a refinement and flexibility release on top of v1.1.0p. It added `--exclude-str` support for skipping matching entries during both organize and undo, changed organize and undo to take the parsed args object directly, and improved output so moves displayed the full target path rather than only the root folder plus filename. The overall command structure stayed the same, but the behavior became cleaner and more configurable.
   
@@ -23,7 +23,7 @@ Changed
 - passed the parsed `args` object into top-level command functions from `main()`  
 - improved move output so destination paths show the full target path
   
-**PRISM [v1.1.0p] (4/11/26)**  
+## PRISM [v1.1.0p] (4/11/26)  
 
 PRISM v1.1.0p was the first major usability and safety expansion. It introduced a real CLI with `organize`, `undo`, and `list-logs`, added JSON move logs in `.prism_logs,` added undo support for the most recent run or a specific log file, added `--sort-hidden`, and started tracking moved, skipped, and errored files during organize runs. This is the version where PRISM became a real command tool instead of just a sorter script.  
   
@@ -37,7 +37,7 @@ Added
 Changed  
 - expanded v1.0.0p organize mode to track moved, skipped, and errored files
   
-**PRISM [v1.0.0p] (4/10/26)**  
+## PRISM [v1.0.0p] (4/10/26)  
 
 PRISM v1.0.0p was the initial structured organizer release. It could collect top-level files, sort them by extension into category folders, avoid overwriting duplicates by generating numbered filenames, and preview actions with a basic dry-run mode. At this stage, it was still a relatively simple organizer script with no command-based CLI, no hidden-file handling, no logging, and no undo support yet.  
   
