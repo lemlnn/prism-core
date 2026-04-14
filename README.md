@@ -1,4 +1,5 @@
 # prism-core
+[View the Changelog](./CHANGELOG.md)
 
 A specialized file utility
 by Lemuel L.  
