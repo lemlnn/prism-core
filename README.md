@@ -3,7 +3,7 @@
 A specialized file utility
 by Lemuel L.  
  
-PRISM is a tool that automatically cleans up and organizes messy files while giving you safe ways to preview, undo, and (soon) customize what it does.  
+PRISM is a tool that automatically cleans up and organizes messy files while giving you safe ways to preview, undo, and customize what it does through persistent config.
  
 **Current Features:**
 
@@ -16,13 +16,29 @@ PRISM is a tool that automatically cleans up and organizes messy files while giv
   * saves organize runs as JSON logs in `.prism_logs`
   * undo for the most recent run or a specific log
   * automatic cleanup/update of undo logs
+* Config:
+  * persistent config support via `~/.prism_config/default.json`
+  * runtime config loading with CLI override behavior
+  * default config initialization through the `config` command
 * CLI:
-  * command-based CLI interface via `argparse` with 3 commands and their respective flags
+  * command-based CLI interface via `argparse` with 4 commands and their respective flags
     * `organize` (`--dry-run`, `--sort-hidden`, `--exclude-str`)
     * `undo` (`--dry-run`, `--log-file`, `--exclude-str`)
     * `list-logs`
+    * `config`
 * Error handling:
   * basic filesystem error handling during organize and undo tasks
+ 
+**Quick Start:**
+
+* initialize default config:
+  * `python PRISM-v1.2.0p.py config`
+* organize files:
+  * `python PRISM-v1.2.0p.py organize`
+* preview without moving:
+  * `python PRISM-v1.2.0p.py organize --dry-run`
+* undo the most recent run:
+  * `python PRISM-v1.2.0p.py undo`
 
 **Planned Features:**
 
@@ -41,7 +57,7 @@ Special thanks to my Alpha testers and early contributors!
 * Development Team:
   * Lemuel ([@lemlnn](https://github.com)) - Lead Developer
 * Alpha Testers:
-  * Bella - beta MacOS Compat attempt
+  * Bella - beta macOS Compat attempt
   * Gavin ([@dojozycknar10-player](https://github.com)) - Windows 11 Compat
   * Maxwell ([@b135-crypto](https://github.com)) - Planned Zorin OS & macOS Compat
 * Early Contributors:
