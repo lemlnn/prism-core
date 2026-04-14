@@ -37,10 +37,11 @@ PRISM is a tool that automatically cleans up and organizes messy files while giv
 * Fedora KDE 42/43
     
 **Credits:**
-
+Special thanks to my Alpha testers and early contributors!
 * Development Team:
   * Lemuel ([@lemlnn](https://github.com)) - Lead Developer
 * Alpha Testers:
+  * Bella - beta MacOS Compat attempt
   * Gavin ([@dojozycknar10-player](https://github.com)) - Windows 11 Compat
   * Maxwell ([@b135-crypto](https://github.com)) - Planned Zorin OS & macOS Compat
 * Contributors:
