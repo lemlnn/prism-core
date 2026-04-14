@@ -44,6 +44,6 @@ Special thanks to my Alpha testers and early contributors!
   * Bella - beta MacOS Compat attempt
   * Gavin ([@dojozycknar10-player](https://github.com)) - Windows 11 Compat
   * Maxwell ([@b135-crypto](https://github.com)) - Planned Zorin OS & macOS Compat
-* Contributors:
+* Early Contributors:
   * Enoch ([@Wavefire5201](https://github.com))
   * Gavin ([@dojozycknar10-player](https://github.com))
