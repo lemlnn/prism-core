@@ -31,9 +31,11 @@ Added
 - JSON run logs in `.prism_logs`  
 - undo support for recent organize runs  
 - added CLI with `organize`, `undo`, and `list-logs` commands
-- expanded v1.0.0p organize mode to track moved, skipped, and errored files
 - `--log-file` support for targeted undo
 - `--sort-hidden` support
+
+Changed  
+- expanded v1.0.0p organize mode to track moved, skipped, and errored files
   
 **PRISM v1.0.0p (4/10/26)**  
 
