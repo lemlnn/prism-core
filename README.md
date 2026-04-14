@@ -2,7 +2,7 @@
 
 A specialized file utility
 by Lemuel L.
-
+PRISM is a tool that automatically cleans up and organizes messy files while giving you safe ways to preview, undo, and (soon) customize what it does.
 **Current Features:**
 
 * Core:
