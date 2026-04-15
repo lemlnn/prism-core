@@ -357,21 +357,24 @@ def write_default_config(config_path: Path) -> None:
 def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConfig:
     loaded_config = loaded_config or {}
 
+    dry_run_arg = getattr(args, "dry_run", None)
+    sort_hidden_arg = getattr(args, "sort_hidden", None)
+    exclude_str_arg = getattr(args, "exclude_str", None)
+
     return RuntimeConfig(
         script_name=loaded_config.get("script_name", default_config.script_name),
         script_version=loaded_config.get("script_version", default_config.script_version),
         log_dir_name=loaded_config.get("log_dir_name", default_config.log_dir_name),
         folder_path=Path(loaded_config.get("folder_path", default_config.folder_path)),
         config_dir_path=Path(loaded_config.get("config_dir_path", default_config.config_dir_path)),
-        dry_run=args.dry_run if args.dry_run is not None else loaded_config.get("dry_run", default_config.dry_run),
-        sort_hidden=args.sort_hidden if args.sort_hidden is not None else loaded_config.get("sort_hidden", default_config.sort_hidden),
-        exclude_str=args.exclude_str if args.exclude_str is not None else loaded_config.get("exclude_str", default_config.exclude_str),
+        dry_run=dry_run_arg if dry_run_arg is not None else loaded_config.get("dry_run", default_config.dry_run),
+        sort_hidden=sort_hidden_arg if sort_hidden_arg is not None else loaded_config.get("sort_hidden", default_config.sort_hidden),
+        exclude_str=exclude_str_arg if exclude_str_arg is not None else loaded_config.get("exclude_str", default_config.exclude_str),
         default_file_types=loaded_config.get(
             "default_file_types",
             {k: v[:] for k, v in default_config.default_file_types.items()}
         ),
     )
-
 def serialize_config(runtime_config: RuntimeConfig) -> dict:
     data = asdict(runtime_config)
     for key, value in data.items():
