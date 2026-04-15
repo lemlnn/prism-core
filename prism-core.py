@@ -32,7 +32,7 @@ DEFAULT_FILE_TYPES = {
 @dataclass(frozen=True)
 class DefaultConfig:
     script_name: str = Path(__file__).name
-    script_version: str = "1.2.0p"
+    script_version: str = "1.2.1p"
     log_dir_name: str = ".prism_logs"
     folder_path: Path = Path(__file__).resolve().parent
     config_dir_path: Path = Path.home() / ".prism_config"
@@ -452,11 +452,27 @@ def parse_args() -> argparse.Namespace:
         type=str,
         help="Specific log file inside .prism_logs/ to undo."
     )
+    config_parser.add_argument(
+        "--path",
+        action="store_true",
+        help="Shows the config path the script is using"
+    )
+    config_parser.add_argument(
+        "--create",
+        action="store_true",
+        help="Creates the config JSON"
+    )
     return parser.parse_args()
 
 #endregion
+#region utility-functions
+
+def pause_before_exit() -> None:
+    if sys.stdin is not None and sys.stdin.isatty():
+        input("\nPress Enter to exit...")
 
 #region main
+
 def main() -> None:
     args = parse_args()
     config_path = default_config.config_dir_path / "default.json"
@@ -474,14 +490,34 @@ def main() -> None:
         print(f"Working in {runtime_config.folder_path}")
         organize_files(runtime_config.folder_path, runtime_config)
     elif args.sub == "config":
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        if config_path.exists():
-            print(f"[info] Config already exists: {config_path}")
+        if args.create:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            if config_path.exists():
+                print(f"[info] Config already exists: {config_path}")
+
+            else:
+                write_default_config(config_path)
+                print(f"[success] Wrote default config: {config_path}")
+        elif args.path:
+            print(f"[info] Config path: {config_path}")
+            if config_path.exists():
+                print("[info] Config file exists.")
+            else:
+                print("[info] Config file does not exist yet.")
         else:
-            write_default_config(config_path)
-            print(f"[success] Wrote default config: {config_path}")
+            print("No config action provided.\n")
+            print("Examples:")
+            print(f"  {runtime_config.script_name} config --create")
+            print(f"  {runtime_config.script_name} config --path")
+            pause_before_exit()
     else:
-        print(f"No command provided. Try '{runtime_config.script_name} organize' or use --help")
+        print("No command provided.\n")
+        print("Examples:")
+        print(f"  {runtime_config.script_name} config")
+        print(f"  {runtime_config.script_name} organize --dry-run")
+        print(f"  {runtime_config.script_name} organize")
+        print(f"  {runtime_config.script_name} undo")
+        pause_before_exit()
 
 
 if __name__ == "__main__":
