@@ -33,13 +33,13 @@ PRISM is a tool that automatically cleans up and organizes messy files while giv
 **Quick Start:**
 
 * initialize default config:
-  * `python PRISM-v1.2.0p.py config`
+  * `python prism-core.py config`
 * organize files:
-  * `python PRISM-v1.2.0p.py organize`
+  * `python prism-core.py organize`
 * preview without moving:
-  * `python PRISM-v1.2.0p.py organize --dry-run`
+  * `python prism-core.py organize --dry-run`
 * undo the most recent run:
-  * `python PRISM-v1.2.0p.py undo`
+  * `python prism-core.py undo`
 
 **Planned Features:**
 
