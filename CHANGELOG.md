@@ -1,4 +1,20 @@
 # Changelog
+
+## PRISM [v1.2.1p] (4/15/26)
+
+PRISM v1.2.1p is a small follow-up usability release after the v1.2.0p config-system update. It focuses on making the CLI less awkward to use when launched directly and adds a more navigable entry point for basic config actions.
+
+Added
+
+- pause-before-exit behavior when launched directly without a command, to avoid appearing to immediately close or crash
+- `config --create` support for creating the default config file
+- `config --path` support for showing the config file path and whether the file exists
+
+Changed
+
+- improved no-command output by showing clearer example commands
+- improved config command output when no config action is provided
+
   
 ## PRISM [1.2.0p] (4/14/26)
   
