@@ -1,5 +1,22 @@
 # Changelog
 
+## PRISM [v1.2.2p] (4/15/26)
+
+PRISM v1.2.2p expands the config command into a more complete navigation and inspection layer. It adds direct ways to create, locate, inspect, summarize, and reset the active config, while also improving overall CLI usability.
+
+Added
+
+* `config --status` for a organized config summary
+* `config --show` for raw JSON display of the currently loaded config
+* `config --reset` for resetting the default config file to defaults
+* top-level `--version` flag
+
+Changed
+
+* expanded config command guidance with clearer example usage
+* improved config UX by separating organized status from raw JSON display
+* continued CLI polish for the config workflow
+
 ## PRISM [v1.2.1p] (4/15/26)
 
 PRISM v1.2.1p is a small follow-up usability release after the v1.2.0p config-system update. It focuses on making the CLI less awkward to use when launched directly and adds a more navigable entry point for basic config actions.
