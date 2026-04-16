@@ -32,7 +32,7 @@ DEFAULT_FILE_TYPES = {
 @dataclass(frozen=True)
 class DefaultConfig:
     script_name: str = Path(__file__).name
-    script_version: str = "1.2.1p"
+    script_version: str = "1.2.2p"
     log_dir_name: str = ".prism_logs"
     folder_path: Path = Path(__file__).resolve().parent
     config_dir_path: Path = Path.home() / ".prism_config"
@@ -157,7 +157,7 @@ def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
         if runtime_config.exclude_str is not None and runtime_config.exclude_str in path.name:
             continue
         if runtime_config.dry_run:
-            if is_hidden(path) == True and runtime_config.sort_hidden == False:
+            if is_hidden(path) and not runtime_config.sort_hidden:
                 print(f"[dry-run] {path.name} is hidden, skipping")
                 files_skipped += 1
                 continue
@@ -165,7 +165,7 @@ def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
             files_moved += 1
         else:
             try:
-                if is_hidden(path) == True and runtime_config.sort_hidden == False:
+                if is_hidden(path) and not runtime_config.sort_hidden:
                     files_skipped += 1
                     continue
                 target_path.parent.mkdir(exist_ok=True)
@@ -396,6 +396,34 @@ def load_config(config_path: Path) -> dict:
     except Exception as error:
         print(f"[warn] Could not read config file: {error}")
         return {}
+    
+def build_config_status_lines(runtime_config: RuntimeConfig, config_path: Path) -> list[str]:
+    lines = []
+
+    lines.append("PRISM Config Status")
+    lines.append("-------------------")
+    lines.append(f"Config path: {config_path}")
+
+    if config_path.exists():
+        lines.append("Config file: exists")
+    else:
+        lines.append("Config file: missing")
+
+    lines.append("")
+    lines.append("Current runtime settings:")
+    lines.append(f"  Script version : {runtime_config.script_version}")
+    lines.append(f"  Working folder : {runtime_config.folder_path}")
+    lines.append(f"  Log directory  : {runtime_config.log_dir_name}")
+    lines.append(f"  Dry run        : {runtime_config.dry_run}")
+    lines.append(f"  Sort hidden    : {runtime_config.sort_hidden}")
+    lines.append(f"  Exclude string : {runtime_config.exclude_str if runtime_config.exclude_str is not None else 'None'}")
+    lines.append(f"  File categories: {len(runtime_config.default_file_types)}")
+
+    return lines
+
+def show_config_status(runtime_config: RuntimeConfig, config_path: Path) -> None:
+    for line in build_config_status_lines(runtime_config, config_path):
+        print(line)
 
 #endregion
 
@@ -462,6 +490,26 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Creates the config JSON"
     )
+    config_parser.add_argument(
+        "--status",
+        action="store_true",
+        help="Shows a organized summary of the config JSON"
+    )
+    config_parser.add_argument(
+    "--show",
+    action="store_true",
+    help="Shows the config JSON"
+    )
+    config_parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Resets the default config file to defaults"
+    )
+    parser.add_argument(
+    "--version",
+    action="version",
+    version=f"%(prog)s {default_config.script_version}"
+    )
     return parser.parse_args()
 
 #endregion
@@ -504,11 +552,22 @@ def main() -> None:
                 print("[info] Config file exists.")
             else:
                 print("[info] Config file does not exist yet.")
+        elif args.reset:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            write_default_config(config_path)
+            print(f"[success] Reset config: {config_path}")
+        elif args.status:
+            show_config_status(runtime_config, config_path)
+        elif args.show:
+            print(json.dumps(serialize_config(runtime_config), indent=4))
         else:
             print("No config action provided.\n")
             print("Examples:")
             print(f"  {runtime_config.script_name} config --create")
             print(f"  {runtime_config.script_name} config --path")
+            print(f"  {runtime_config.script_name} config --status")
+            print(f"  {runtime_config.script_name} config --show")
+            print(f"  {runtime_config.script_name} config --reset")
             pause_before_exit()
     else:
         print("No command provided.\n")
