@@ -1,7 +1,7 @@
 # prism-core
 
-[View the Changelog](./CHANGELOG.md)
-[Read the User Guide](./docs/USER_GUIDE.md)
+[View the Changelog](./CHANGELOG.md)  
+[Read the User Guide](./docs/USER_GUIDE.md)  
 
 A specialized file utility
 by Lemuel L.
