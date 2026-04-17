@@ -1,98 +1,108 @@
 # prism-core
 
 [View the Changelog](./CHANGELOG.md)
+[Read the User Guide](./docs/USER_GUIDE.md)
 
 A specialized file utility
 by Lemuel L.
 
-PRISM is a tool that automatically cleans up and organizes messy files while giving you safe ways to preview, undo, inspect, and customize its behavior through persistent config.
+PRISM is a file organizer that automatically cleans up messy files while giving you safe ways to preview, undo, inspect, and customize behavior through persistent config profiles.
 
-**Current Features:**
+## Current Features
 
-* Core:
+### Core
 
-  * extension-based file sorting
-  * duplicate-safe renaming
-  * optional hidden-file sorting
+* extension-based file sorting
+* duplicate-safe renaming
+* optional hidden-file sorting
 
-* Safety:
+### Safety
 
-  * supports dry-run preview for organize and undo
-  * saves organize runs as JSON logs in `.prism_logs`
-  * undo for the most recent run or a specific log
-  * automatic cleanup/update of undo logs
+* dry-run preview for `organize` and `undo`
+* JSON run logs saved in `.prism_logs`
+* undo for the most recent run or a specific log
+* automatic cleanup and update of undo logs
 
-* Config:
+### Config Profiles
 
-  * persistent config support via `~/.prism_config/default.json`
-  * runtime config loading with CLI override behavior
-  * default config initialization through `config --create`
-  * config path lookup through `config --path`
-  * organized config summary through `config --status`
-  * raw config display through `config --show`
-  * config reset through `config --reset`
+* persistent config profile support via `~/.prism_config/*.json`
+* runtime config loading with CLI override behavior
+* default config initialization through `config --create`
+* named profile selection through `-c` / `--config`
+* runtime config saving through `config --save`
+* available profile listing through `config --list`
+* config path lookup through `config --path`
+* organized config summary through `config --status`
+* raw config display through `config --show`
+* config reset through `config --reset`
 
-* CLI:
+### CLI
 
-  * command-based CLI interface via `argparse` with 4 commands and their respective flags
+* command-based CLI interface via `argparse`
 
-    * `organize` (`--dry-run`, `--sort-hidden`, `--exclude-str`)
-    * `undo` (`--dry-run`, `--log-file`, `--exclude-str`)
-    * `list-logs`
-    * `config` (`--create`, `--path`, `--status`, `--show`, `--reset`)
-  * top-level version reporting through `--version`
+  * `organize` (`--dry-run`, `--sort-hidden`, `--exclude-str`)
+  * `undo` (`--dry-run`, `--log-file`, `--exclude-str`)
+  * `list-logs`
+  * `config` (`--create`, `--save`, `--list`, `--path`, `--status`, `--show`, `--reset`)
+* global profile selection through `-c` / `--config`
+* top-level version reporting through `--version`
 
-* Error handling:
+### Error Handling
 
-  * basic filesystem error handling during organize and undo tasks
+* basic filesystem error handling during organize and undo tasks
 
-**Quick Start:**
+## Quick Start
 
-* check the current version:
-  * `python prism-core.py --version`
-* initialize default config:
-  * `python prism-core.py config --create`
-* show config path:
-  * `python prism-core.py config --path`
-* show config status:
-  * `python prism-core.py config --status`
-* show raw config JSON:
-  * `python prism-core.py config --show`
-* organize files:
-  * `python prism-core.py organize`
-* preview without moving:
-  * `python prism-core.py organize --dry-run`
-* undo the most recent run:
-  * `python prism-core.py undo`
+* check the current version
+  `python prism-core.py --version`
 
-**Planned Features:**
+* initialize the default profile
+  `python prism-core.py config --create`
+
+* organize files
+  `python prism-core.py organize`
+
+* preview without moving
+  `python prism-core.py organize --dry-run`
+
+* create and use a named profile
+  `python prism-core.py -c photography config --create`
+  `python prism-core.py -c photography organize`
+
+* undo the most recent run
+  `python prism-core.py undo`
+
+For full usage details, config profile workflows, and examples, see [docs/USER_GUIDE.md](./docs/USER_GUIDE.md).
+
+## Planned Features
 
 * TUI support using `textual`
 * flatten mode for moving files to prepare for the organize command
 * `.exe` and `.pkg` packages
 * possible extension system using a hooks/events model
 
-**Currently Tested Platforms:**
+## Currently Tested Platforms
 
 * Windows 10/11
 * Fedora KDE 42/43
 
-**Credits:**
-Special thanks to my Alpha testers and early contributors!
+## Credits
 
-* Development Team:
+Special thanks to my alpha testers and early contributors.
 
-  * Lemuel ([@lemlnn](https://github.com)) - Lead Developer
+### Development Team
 
-* Alpha Testers:
+* Lemuel ([@lemlnn](https://github.com)) - Lead Developer
 
-  * Bella - beta macOS compatibility attempt
-  * Gavin ([@dojozycknar10-player](https://github.com)) - Windows 11 compatibility
-  * Maxwell ([@b135-crypto](https://github.com)) - planned Zorin OS and macOS compatibility
+### Alpha Testers
 
-* Early Contributors:
+* Bella - beta macOS compatibility attempt
+* Gavin ([@dojozycknar10-player](https://github.com)) - Windows 11 compatibility
+* Maxwell ([@b135-crypto](https://github.com)) - planned Zorin OS and macOS compatibility
 
-  * Enoch ([@Wavefire5201](https://github.com))
-  * Gavin ([@dojozycknar10-player](https://github.com))
+### Early Contributors
+
+* Enoch ([@Wavefire5201](https://github.com))
+* Gavin ([@dojozycknar10-player](https://github.com))
 
 This project is licensed under the Apache License 2.0. See the LICENSE file for details.
