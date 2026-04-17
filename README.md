@@ -1,7 +1,7 @@
 # prism-core
 
-[View the Changelog](./CHANGELOG.md)  
-[Read the User Guide](./docs/USER_GUIDE.md)  
+[View the Changelog](./CHANGELOG.md)
+[Read the User Guide](./docs/USER_GUIDE.md)
 
 A specialized file utility
 by Lemuel L.
@@ -35,6 +35,7 @@ PRISM is a file organizer that automatically cleans up messy files while giving 
 * organized config summary through `config --status`
 * raw config display through `config --show`
 * config reset through `config --reset`
+* config deletion through `config --delete`
 
 ### CLI
 
@@ -43,7 +44,7 @@ PRISM is a file organizer that automatically cleans up messy files while giving 
   * `organize` (`--dry-run`, `--sort-hidden`, `--exclude-str`)
   * `undo` (`--dry-run`, `--log-file`, `--exclude-str`)
   * `list-logs`
-  * `config` (`--create`, `--save`, `--list`, `--path`, `--status`, `--show`, `--reset`)
+  * `config` (`--create`, `--save`, `--list`, `--path`, `--status`, `--show`, `--reset`, `--delete`)
 * global profile selection through `-c` / `--config`
 * top-level version reporting through `--version`
 
