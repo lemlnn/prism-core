@@ -372,6 +372,21 @@ def write_config(config_path: Path, runtime_config: RuntimeConfig) -> None:
     with config_path.open("w", encoding="utf-8") as json_output:
         json.dump(serialize_config(runtime_config), json_output, indent=4)
 
+def delete_config(config_path: Path) -> None:
+    if not config_path.exists():
+        print(f"[error] Config file does not exist: {config_path}")
+        return
+    
+    confirm = input(f"[input] Are you sure you want to delete '{config_path.stem}'? (y/n): ").lower()
+    if confirm == 'y':
+        try:
+            config_path.unlink()
+            print(f"[success] Deleted config: {config_path}")
+        except Exception as error:
+            print(f"[error] Could not delete config: {error}")
+    else:
+        print("[info] Deletion cancelled.")
+
 def load_config(config_path: Path) -> dict:
     try:
         with config_path.open("r", encoding="utf-8") as json_input:
@@ -542,6 +557,7 @@ def parse_args() -> argparse.Namespace:
     config_actions.add_argument("--show", action="store_true", help="Print raw JSON configuration")
     config_actions.add_argument("--path", action="store_true", help="Show location of config file")
     config_actions.add_argument("--reset", action="store_true", help="Restore profile to defaults")
+    config_actions.add_argument("--delete", action="store_true", help="Remove the current config profile")
 
     parser.add_argument(
         "--version",
@@ -605,6 +621,8 @@ def main() -> None:
             config_path.parent.mkdir(parents=True, exist_ok=True)
             write_default_config(config_path)
             print(f"[success] Reset config: {config_path}")
+        elif args.delete:
+            delete_config(config_path)
         elif args.status:
             show_config_status(runtime_config, config_path)
         elif args.show:
@@ -618,6 +636,7 @@ def main() -> None:
             print(f"  {runtime_config.script_name} config --status")
             print(f"  {runtime_config.script_name} config --show")
             print(f"  {runtime_config.script_name} config --reset")
+            print(f"  {runtime_config.script_name} config --delete")
             print(f"  {runtime_config.script_name} config --help")
             pause_before_exit()
     else:
