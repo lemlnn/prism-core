@@ -2,13 +2,14 @@
 
 ## PRISM [v1.2.3p] (4/17/26)
 
-PRISM v1.2.3p expands the config system into a full profile workflow. It adds named profile selection, runtime config saving, profile listing, and improved CLI guidance.
+PRISM v1.2.3p expands the config system into a full profile workflow. It adds named profile selection, runtime config saving, profile listing, profile deletion, and improved CLI guidance.
 
 Added
 
 * global `-c` / `--config` option for selecting configuration profiles
 * `config --save` for saving current runtime settings into the selected profile
 * `config --list` for listing available configuration profiles
+* `config --delete` for removing the selected configuration profile
 * shared runtime-setting support in `config` for saving values like `--dry-run`, `--exclude-str`, and `--sort-hidden`
 
 Changed
@@ -16,6 +17,7 @@ Changed
 * config loading now resolves against the selected profile instead of only `default.json`
 * config command help and examples now reflect profile-based usage more clearly
 * documentation flow now better matches the profile-based config system
+* config profiles now support a more complete lifecycle from creation to deletion
 
 ## PRISM [v1.2.2p] (4/15/26)
 
