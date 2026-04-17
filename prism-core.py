@@ -32,7 +32,7 @@ DEFAULT_FILE_TYPES = {
 @dataclass(frozen=True)
 class DefaultConfig:
     script_name: str = Path(__file__).name
-    script_version: str = "1.2.2p"
+    script_version: str = "1.2.3p"
     log_dir_name: str = ".prism_logs"
     folder_path: Path = Path(__file__).resolve().parent
     config_dir_path: Path = Path.home() / ".prism_config"
@@ -316,6 +316,20 @@ def list_logs(folder_path: Path, log_dir_name: str) -> None:
     for log in logs:
         print(f" - {log.name}")
 
+def list_configs(config_dir: Path) -> None:
+    if not config_dir.exists():
+        print("[info] No config directory found.")
+        return
+
+    configs = sorted(config_dir.glob("*.json"))
+    if not configs:
+        print("[info] No configurations found.")
+        return
+
+    print("Available configurations:")
+    for cfg in configs:
+        print(f" - {cfg.stem}")
+
 #endregion
 
 #region config-functions
@@ -354,6 +368,28 @@ def write_default_config(config_path: Path) -> None:
     with config_path.open("w", encoding="utf-8") as json_output:
         json.dump(serialize_default_config(), json_output, indent=4)
 
+def write_config(config_path: Path, runtime_config: RuntimeConfig) -> None:
+    with config_path.open("w", encoding="utf-8") as json_output:
+        json.dump(serialize_config(runtime_config), json_output, indent=4)
+
+def load_config(config_path: Path) -> dict:
+    try:
+        with config_path.open("r", encoding="utf-8") as json_input:
+            data = json.load(json_input)
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except Exception as error:
+        print(f"[warn] Could not read config file: {error}")
+        return {}
+    
+def serialize_config(runtime_config: RuntimeConfig) -> dict:
+    data = asdict(runtime_config)
+    for key, value in data.items():
+        if isinstance(value, Path):
+            data[key] = str(value)
+    return data
+
 def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConfig:
     loaded_config = loaded_config or {}
 
@@ -375,29 +411,8 @@ def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConf
             {k: v[:] for k, v in default_config.default_file_types.items()}
         ),
     )
-def serialize_config(runtime_config: RuntimeConfig) -> dict:
-    data = asdict(runtime_config)
-    for key, value in data.items():
-        if isinstance(value, Path):
-            data[key] = str(value)
-    return data
 
-def write_config(config_path: Path, runtime_config: RuntimeConfig) -> None:
-    with config_path.open("w", encoding="utf-8") as json_output:
-        json.dump(serialize_config(runtime_config), json_output, indent=4)
-
-def load_config(config_path: Path) -> dict:
-    try:
-        with config_path.open("r", encoding="utf-8") as json_input:
-            data = json.load(json_input)
-        return data if isinstance(data, dict) else {}
-    except FileNotFoundError:
-        return {}
-    except Exception as error:
-        print(f"[warn] Could not read config file: {error}")
-        return {}
-    
-def build_config_status_lines(runtime_config: RuntimeConfig, config_path: Path) -> list[str]:
+def build_config_status(runtime_config: RuntimeConfig, config_path: Path) -> list[str]:
     lines = []
 
     lines.append("PRISM Config Status")
@@ -422,7 +437,7 @@ def build_config_status_lines(runtime_config: RuntimeConfig, config_path: Path) 
     return lines
 
 def show_config_status(runtime_config: RuntimeConfig, config_path: Path) -> None:
-    for line in build_config_status_lines(runtime_config, config_path):
+    for line in build_config_status(runtime_config, config_path):
         print(line)
 
 #endregion
@@ -430,86 +445,110 @@ def show_config_status(runtime_config: RuntimeConfig, config_path: Path) -> None
 #region args-functions
 
 def parse_args() -> argparse.Namespace:
+    usage_info = "%(prog)s [options] {organize,undo,list-logs,config} ..."
+    
+    example_usage = textwrap.dedent("""
+        Commands:
+          organize    Sort files into categorized folders
+          undo        Revert the last organization run
+          list-logs   Show history of previous runs
+          config      Manage settings and custom profiles
 
-    parser = argparse.ArgumentParser(description="Organize files in the current folder.")
-    subparsers = parser.add_subparsers(dest="sub", required=False)
+        Examples:
+          %(prog)s organize --dry-run
+          %(prog)s -c my_profile config --save --dry-run --exclude-str "Draft"
+          %(prog)s -c photography organize
+          %(prog)s config --list
+          %(prog)s undo
+    """)
+
+    parser = argparse.ArgumentParser(
+        description="PRISM: A smart file organizer that categorizes files by type.",
+        usage=usage_info,
+        epilog=example_usage,
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+
+    global_group = parser.add_argument_group("Global Options")
+    global_group.add_argument(
+        "-c", "--config",
+        metavar="NAME",
+        dest="config_name",
+        default="default",
+        help="Use a specific configuration profile (default: 'default')"
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", title="Available Commands", metavar="")
     shared_flags = argparse.ArgumentParser(add_help=False)
 
-    #shared flags
     shared_flags.add_argument(
         "--dry-run",
         action="store_true",
         default=None,
-        help="Preview actions without moving files."
+        help="Preview changes without moving any files"
     )
     shared_flags.add_argument(
         "--exclude-str",
+        metavar="TEXT",
         type=str,
-        help="Excludes a entry that contains the specified string"
+        help="Skip files containing this specific text"
     )
 
-    #commands
     organize_parser = subparsers.add_parser(
         "organize",
         parents=[shared_flags],
-        help="Runs the organizer script"
+        help="Sort files into folders"
     )
-    undo_parser = subparsers.add_parser(
-        "undo",
-        parents=[shared_flags],
-        help="Reverses the most recent organize run"
-    )
-    list_logs_parser = subparsers.add_parser(
-        "list-logs",
-        help="List available run logs"
-    )
-    config_parser = subparsers.add_parser(
-        "config",
-        help="Config the settings, save/load configs"
-    )
-
-    #specific flags
     organize_parser.add_argument(
         "--sort-hidden",
         action="store_true",
         default=None,
-        help="Sorts hidden files."
+        help="Include hidden files (starting with '.')"
+    )
+
+    undo_parser = subparsers.add_parser(
+        "undo",
+        parents=[shared_flags],
+        help="Reverse a previous run"
     )
     undo_parser.add_argument(
         "--log-file",
+        metavar="FILENAME",
         type=str,
-        help="Specific log file inside .prism_logs/ to undo."
+        help="Specify a specific log to undo"
+    )
+
+    subparsers.add_parser(
+        "list-logs",
+        help="View organization history"
+    )
+
+    config_parser = subparsers.add_parser(
+        "config",
+        parents=[shared_flags],
+        help="Manage configuration profiles"
     )
     config_parser.add_argument(
-        "--path",
+        "--sort-hidden",
         action="store_true",
-        help="Shows the config path the script is using"
+        default=None,
+        help="Include hidden files (starting with '.')"
     )
-    config_parser.add_argument(
-        "--create",
-        action="store_true",
-        help="Creates the config JSON"
-    )
-    config_parser.add_argument(
-        "--status",
-        action="store_true",
-        help="Shows a organized summary of the config JSON"
-    )
-    config_parser.add_argument(
-    "--show",
-    action="store_true",
-    help="Shows the config JSON"
-    )
-    config_parser.add_argument(
-        "--reset",
-        action="store_true",
-        help="Resets the default config file to defaults"
-    )
+    config_actions = config_parser.add_mutually_exclusive_group()
+    config_actions.add_argument("--create", action="store_true", help="Initialize a new config file")
+    config_actions.add_argument("--save", action="store_true", help="Save current settings to profile")
+    config_actions.add_argument("--list", action="store_true", help="List all saved profiles")
+    config_actions.add_argument("--status", action="store_true", help="Show current profile summary")
+    config_actions.add_argument("--show", action="store_true", help="Print raw JSON configuration")
+    config_actions.add_argument("--path", action="store_true", help="Show location of config file")
+    config_actions.add_argument("--reset", action="store_true", help="Restore profile to defaults")
+
     parser.add_argument(
-    "--version",
-    action="version",
-    version=f"%(prog)s {default_config.script_version}"
+        "--version",
+        action="version",
+        version=f"%(prog)s {default_config.script_version}"
     )
+
     return parser.parse_args()
 
 #endregion
@@ -523,29 +562,39 @@ def pause_before_exit() -> None:
 
 def main() -> None:
     args = parse_args()
-    config_path = default_config.config_dir_path / "default.json"
+    
+    config_name = args.config_name
+    if not config_name.endswith(".json"):
+        config_name += ".json"
+    
+    config_path = default_config.config_dir_path / config_name
 
     loaded_config = load_config(config_path)
     runtime_config = build_runtime_config(args, loaded_config)
 
-    if args.sub == "list-logs":
+    if args.command == "list-logs":
         list_logs(runtime_config.folder_path, runtime_config.log_dir_name)
         return
-    elif args.sub == "undo":
+    elif args.command == "undo":
         print(f"Working in {runtime_config.folder_path}")
         undo_recent_organize(runtime_config.folder_path, args, runtime_config)
-    elif args.sub == "organize":
+    elif args.command == "organize":
         print(f"Working in {runtime_config.folder_path}")
         organize_files(runtime_config.folder_path, runtime_config)
-    elif args.sub == "config":
+    elif args.command == "config":
         if args.create:
             config_path.parent.mkdir(parents=True, exist_ok=True)
             if config_path.exists():
                 print(f"[info] Config already exists: {config_path}")
-
             else:
                 write_default_config(config_path)
                 print(f"[success] Wrote default config: {config_path}")
+        elif args.save:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            write_config(config_path, runtime_config)
+            print(f"[success] Saved runtime config to: {config_path}")
+        elif args.list:
+            list_configs(default_config.config_dir_path)
         elif args.path:
             print(f"[info] Config path: {config_path}")
             if config_path.exists():
@@ -563,19 +612,23 @@ def main() -> None:
         else:
             print("No config action provided.\n")
             print("Examples:")
-            print(f"  {runtime_config.script_name} config --create")
-            print(f"  {runtime_config.script_name} config --path")
+            print(f"  {runtime_config.script_name} -c my_config config --create")
+            print(f"  {runtime_config.script_name} config --list")
+            print(f"  {runtime_config.script_name} config --save")
             print(f"  {runtime_config.script_name} config --status")
             print(f"  {runtime_config.script_name} config --show")
             print(f"  {runtime_config.script_name} config --reset")
+            print(f"  {runtime_config.script_name} config --help")
             pause_before_exit()
     else:
         print("No command provided.\n")
         print("Examples:")
+        print(f"  {runtime_config.script_name} -c my_config organize")
         print(f"  {runtime_config.script_name} config")
         print(f"  {runtime_config.script_name} organize --dry-run")
         print(f"  {runtime_config.script_name} organize")
         print(f"  {runtime_config.script_name} undo")
+        print(f"  {runtime_config.script_name} --help")
         pause_before_exit()
 
 
