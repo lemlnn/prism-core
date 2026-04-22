@@ -36,6 +36,7 @@ PRISM is a file organizer that automatically cleans up messy files while giving 
 * raw config display through `config --show`
 * config reset through `config --reset`
 * config deletion through `config --delete`
+* debug mode persistence through config profiles  
 
 ### CLI
 
@@ -46,6 +47,7 @@ PRISM is a file organizer that automatically cleans up messy files while giving 
   * `list-logs`
   * `config` (`--create`, `--save`, `--list`, `--path`, `--status`, `--show`, `--reset`, `--delete`)
 * global profile selection through `-c` / `--config`
+* global debug control through `--debug-mode` / `--no-debug-mode`
 * top-level version reporting through `--version`
 
 ### Error Handling
@@ -72,10 +74,13 @@ PRISM is a file organizer that automatically cleans up messy files while giving 
 
 * undo the most recent run
   `python prism-core.py undo`
-
+  
+* run with debug output
+  `python prism-core.py --debug-mode organize`  
+  
 For full usage details, config profile workflows, and examples, see [docs/USER_GUIDE.md](./docs/USER_GUIDE.md).
 
-## Planned Features
+## Planned/Future Features
 
 * TUI support using `textual`
 * flatten mode for moving files to prepare for the organize command
