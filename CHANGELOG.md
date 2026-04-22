@@ -1,4 +1,24 @@
-# Changelog
+# Changelog  
+  
+## PRISM [v1.2.4p] (4/22/26)
+
+PRISM v1.2.4p is a pre-extension architecture release focused on internal structure, control flow cleanup, and better separation of responsibilities. It introduces a dedicated app layer for config command handling, a filesystem service layer for file operations and classification logic, and a new debug mode for tracing internal behavior. This release does not add major end-user features, but it significantly improves maintainability and prepares PRISM for future extension-system work.
+
+Added
+
+* debug_mode support in config and runtime state
+* global --debug-mode / --no-debug-mode flag
+* PrismApp class for app-level command handling
+* FileSystemService class for filesystem operations, classification, skip logic, and path handling
+* debug output for classification, target path resolution, undo log selection, missing moved files, and restore-target resolution
+
+Changed
+
+* moved config command handling out of main() and into PrismApp
+* reorganized file operations into a dedicated service layer instead of leaving them spread across top-level functions
+* centralized classify / skip / move / undo helper behavior into cleaner internal routing
+* cleaned up organize and undo flow structure to be easier to reason about and extend later
+* improved internal separation between app control flow, config logic, filesystem behavior, and CLI parsing
 
 ## PRISM [v1.2.3p] (4/17/26)
 
