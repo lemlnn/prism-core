@@ -2,7 +2,7 @@
 
 ## Overview
 
-PRISM organizes top-level files into categorized folders based on file extension. It also supports dry-run previews, JSON logging, undo, and persistent config profiles.
+PRISM organizes top-level files into categorized folders based on file extension. It also supports dry-run previews, JSON logging, undo, persistent config profiles, and debug tracing for internal actions.
 
 ## Basic Commands
 
@@ -12,8 +12,14 @@ Organize files
 Preview without moving files
 `python prism-core.py organize --dry-run`
 
+Run organize with debug output
+`python prism-core.py --debug-mode organize`
+
 Undo the most recent run
 `python prism-core.py undo`
+
+Run undo with debug output
+`python prism-core.py --debug-mode undo`
 
 List previous run logs
 `python prism-core.py list-logs`
@@ -59,12 +65,18 @@ Show the raw config JSON
 Reset the selected profile to defaults
 `python prism-core.py -c photography config --reset`
 
+Delete the selected profile
+`python prism-core.py -c photography config --delete`
+
 ## Saving Runtime Settings into a Profile
 
 Example:
 `python prism-core.py -c photography config --save --dry-run --exclude-str "Draft"`
 
-This saves the current runtime settings into the `photography` profile.
+Another example:
+`python prism-core.py -c dev config --save --debug-mode`
+
+This saves the current runtime settings into the selected profile.
 
 What each part means:
 
@@ -87,16 +99,20 @@ What each part means:
 * `--exclude-str "Draft"`
   sets `exclude_str = "Draft"` before saving
 
+* `--debug-mode`
+  sets `debug_mode = true` before saving
+
 What this does:
 
 1. PRISM loads the selected profile
 2. the CLI flags temporarily override its values
 3. `config --save` writes that final runtime state back into the profile
 
-So after running this command, the `photography` profile will save settings like:
+So after running this command, the selected profile can save settings like:
 
 * `dry_run: true`
 * `exclude_str: "Draft"`
+* `debug_mode: true`
 
 This is useful when you want to build or update a profile from the command line instead of editing JSON by hand.
 
@@ -107,6 +123,8 @@ PRISM resolves settings in this order:
 1. built-in defaults
 2. selected config profile
 3. CLI flag overrides
+
+This applies to settings like `dry_run`, `exclude_str`, `sort_hidden`, and `debug_mode`.
 
 CLI flags temporarily override saved settings unless you save them back into the selected profile with `config --save`.
 
@@ -121,6 +139,10 @@ Photo-specific profile
 `python prism-core.py -c photography config --save --dry-run --exclude-str "Draft"`
 `python prism-core.py -c photography organize`
 
+Debug a run
+`python prism-core.py --debug-mode organize`
+`python prism-core.py --debug-mode undo`
+
 Inspect a profile before use
 `python prism-core.py -c photography config --status`
 `python prism-core.py -c photography config --show`
@@ -128,6 +150,7 @@ Inspect a profile before use
 ## Notes
 
 * Use `--dry-run` before large organize runs.
+* Use `--debug-mode` when you want extra internal tracing for classification, path resolution, and undo behavior.
 * Use `list-logs` to review previous runs.
 * Use `undo` to revert a previous organize run.
 * Use named profiles to separate different workflows safely.
