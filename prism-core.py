@@ -31,8 +31,9 @@ DEFAULT_FILE_TYPES = {
 
 @dataclass(frozen=True)
 class DefaultConfig:
+    debug_mode: bool = False
     script_name: str = Path(__file__).name
-    script_version: str = "1.2.3p"
+    script_version: str = "1.2.4p"
     log_dir_name: str = ".prism_logs"
     folder_path: Path = Path(__file__).resolve().parent
     config_dir_path: Path = Path.home() / ".prism_config"
@@ -45,6 +46,7 @@ class DefaultConfig:
 
 @dataclass
 class RuntimeConfig:
+    debug_mode: bool
     script_name: str
     script_version: str
     log_dir_name: str
@@ -56,95 +58,178 @@ class RuntimeConfig:
     default_file_types: dict[str, list[str]]
 
 default_config = DefaultConfig()
+#endregion
 
-#region folder-indexing-functions
+#region prism-api
 
-def is_hidden(path: Path) -> bool:
-    return path.name.startswith(".")
+class PrismApp:
+    def __init__(self, runtime_config: RuntimeConfig, config_path: Path):
+        self.config = runtime_config
+        self.config_path = config_path
 
+    def handle_config_command(self, args: argparse.Namespace) -> None:
+        if args.create:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            if self.config_path.exists():
+                print(f"[info] Config already exists: {self.config_path}")
+            else:
+                write_default_config(self.config_path)
+                print(f"[success] Wrote default config: {self.config_path}")
 
-def iterate_entries(path: Path):
-    try:
-        with os.scandir(path) as stream:
-            yield from stream
-    except PermissionError:
-        print(f"[error] Access denied to {path}")
-    except FileNotFoundError:
-        print(f"[error] Folder {path} does not exist")
-    except OSError as error_message:
-        print(f"[error] System reported {error_message}")
+        elif args.save:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            write_config(self.config_path, self.config)
+            print(f"[success] Saved runtime config to: {self.config_path}")
 
+        elif args.list:
+            list_configs(default_config.config_dir_path)
 
-def get_entry_type(entry) -> str:
-    try:
-        if entry.is_dir(follow_symlinks=False):
-            return "dir"
-        elif entry.is_file(follow_symlinks=False):
-            return "file"
+        elif args.path:
+            print(f"[info] Config path: {self.config_path}")
+            if self.config_path.exists():
+                print("[info] Config file exists.")
+            else:
+                print("[info] Config file does not exist yet.")
+
+        elif args.reset:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            write_default_config(self.config_path)
+            print(f"[success] Reset config: {self.config_path}")
+
+        elif args.delete:
+            delete_config(self.config_path)
+
+        elif args.status:
+            show_config_status(self.config, self.config_path)
+
+        elif args.show:
+            print(json.dumps(serialize_config(self.config), indent=4))
+
         else:
-            return "unknown"
-    except OSError as error_message:
-        print(f"[error] System reported {error_message}")
-        return "error"
+            print("No config action provided.\n")
+            print("Examples:")
+            print(f"  {self.config.script_name} -c my_config config --create")
+            print(f"  {self.config.script_name} config --list")
+            print(f"  {self.config.script_name} config --save")
+            print(f"  {self.config.script_name} config --status")
+            print(f"  {self.config.script_name} config --show")
+            print(f"  {self.config.script_name} config --reset")
+            print(f"  {self.config.script_name} config --delete")
+            print(f"  {self.config.script_name} config --help")
+            pause_before_exit()
 
+class FileSystemService:
+    def __init__(self, config: RuntimeConfig):
+        self.config = config #devnote: access config here via self.config
 
-def collect_top_level_files(folder: Path) -> list[Path]:
-    files = []
-    for entry in iterate_entries(folder):
-        if get_entry_type(entry) != "file":
-            continue
-        if entry.name == default_config.script_name:
-            continue
-        path = Path(entry.path)
-        files.append(path)
-    return files
+    @staticmethod
+    def iterate_entries(path: Path):
+        try:
+            with os.scandir(path) as stream:
+                yield from stream
+        except PermissionError:
+            print(f"[error] Access denied to {path}")
+        except FileNotFoundError:
+            print(f"[error] Folder {path} does not exist")
+        except OSError as error_message:
+            print(f"[error] System reported {error_message}")
+
+    @staticmethod
+    def get_entry_type(entry) -> str:
+        try:
+            if entry.is_dir(follow_symlinks=False):
+                return "dir"
+            elif entry.is_file(follow_symlinks=False):
+                return "file"
+            else:
+                return "unknown"
+        except OSError as error_message:
+            print(f"[error] System reported {error_message}")
+            return "error"
+
+    def collect_top_level_files(self, folder: Path) -> list[Path]:
+        files = []
+        for entry in self.iterate_entries(folder):
+            if self.get_entry_type(entry) != "file":
+                continue
+            if entry.name == self.config.script_name:
+                continue
+            files.append(Path(entry.path))
+        return files
+
+    @staticmethod
+    def get_unique_path(target_path: Path) -> Path:
+        if not target_path.exists():
+            return target_path
+
+        stem = target_path.stem
+        suffix = target_path.suffix
+        parent = target_path.parent
+        counter = 1
+
+        while True:
+            new_path = parent / f"{stem} ({counter}){suffix}"
+            if not new_path.exists():
+                return new_path
+            counter += 1
+
+    @staticmethod
+    def is_hidden(path: Path) -> bool:
+        return path.name.startswith(".")
+    
+    @staticmethod
+    def get_extension(path: Path) -> str:
+        return path.suffix.lower()
+
+    @staticmethod
+    def get_target_folder(extension: str, file_types: dict[str, list[str]]) -> str:
+        for folder_name, extensions in file_types.items():
+            if extension in extensions:
+                return folder_name
+        return "Others"
+    
+    def classify_file(self, path: Path) -> str:
+        extension = self.get_extension(path)
+        folder_name  = self.get_target_folder(extension, self.config.default_file_types)
+        return folder_name
+    
+    def skip_file(self, path: Path) -> str | None:
+        if self.config.exclude_str is not None and self.config.exclude_str in path.name:
+            return "matches exclude string"
+        elif not self.config.sort_hidden and self.is_hidden(path):
+            return "is hidden file"
+        return None
+    
+    def skip_undo_move(self, original_path: Path, moved_path: Path) -> str | None:
+        if self.config.exclude_str is not None and (
+            self.config.exclude_str in original_path.name or self.config.exclude_str in moved_path.name
+        ):
+            return "matches exclude string"
+        return None
+
+    def build_target_path(self, path: Path, folder: Path) -> Path:
+        folder_name = self.classify_file(path)
+        target_path = folder / folder_name / path.name
+
+        if target_path.exists():
+            return self.get_unique_path(target_path)
+        return target_path
+
+    @staticmethod
+    def path_exists(path: Path) -> bool:
+        return path.exists()
+
+    @staticmethod
+    def move_file(source: Path, destination: Path) -> None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(destination))
+
 #endregion
 
 #region main-functions
-def get_unique_path(target_path: Path) -> Path:
-    if not target_path.exists():
-        return target_path
-
-    stem = target_path.stem
-    extension = target_path.suffix
-    containing_folder = target_path.parent
-    counter = 1
-
-    while True:
-        new_path = containing_folder / f"{stem} ({counter}){extension}"
-        if not new_path.exists():
-            return new_path
-        counter += 1
-
-
-def get_target_folder(extension: str, file_types: dict[str, list[str]]) -> str:
-    for folder_name, extensions in file_types.items():
-        if extension in extensions:
-            return folder_name
-    return "Others"
-
-
-def get_extension(path: Path) -> str:
-    return path.suffix.lower()
-
-
-def build_target_path(
-    path: Path,
-    folder: Path,
-    file_types: dict[str, list[str]]
-) -> Path:
-    extension = get_extension(path)
-    folder_name = get_target_folder(extension, file_types)
-    target_path = folder / folder_name / path.name
-
-    if target_path.exists():
-        return get_unique_path(target_path)
-    return target_path
-
-
-
 def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
-    files = collect_top_level_files(folder)
+    fs = FileSystemService(runtime_config)
+    files = fs.collect_top_level_files(folder)
 
     files_moved = 0
     files_skipped = 0
@@ -152,39 +237,45 @@ def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
     move_log = []
 
     for path in files:
-        target_path = build_target_path(path, folder, runtime_config.default_file_types)
+        skip_reason = fs.skip_file(path)
+        if skip_reason is not None:
+            files_skipped += 1
 
-        if runtime_config.exclude_str is not None and runtime_config.exclude_str in path.name:
+            if runtime_config.dry_run:
+                print(f"[dry-run] Skip: {path.name} ({skip_reason})")
+            elif runtime_config.debug_mode:
+                print(f"[debug] Skip: {path.name} ({skip_reason})")
             continue
+
+        target_path = fs.build_target_path(path, folder)
+
+        if runtime_config.debug_mode:
+            category = fs.classify_file(path)
+            print(f"[debug] Classified: {path.name} -> {category}")
+            print(f"[debug] Target path: {target_path}")
+
         if runtime_config.dry_run:
-            if is_hidden(path) and not runtime_config.sort_hidden:
-                print(f"[dry-run] {path.name} is hidden, skipping")
-                files_skipped += 1
-                continue
-            print(f"[dry-run] {path.name} -> {target_path}")
+            print(f"[dry-run] Move: {path.name} -> {target_path}")
             files_moved += 1
-        else:
-            try:
-                if is_hidden(path) and not runtime_config.sort_hidden:
-                    files_skipped += 1
-                    continue
-                target_path.parent.mkdir(exist_ok=True)
-                shutil.move(str(path), str(target_path))
-                print(f"[success] Moved: {path.name} -> {target_path}")
-                files_moved += 1
-                move_log.append({
-                    "original": str(path),
-                    "moved_to": str(target_path)
-                })
-            except PermissionError:
-                print(f"[error] Access denied to {path}")
-                errors += 1
-            except FileNotFoundError:
-                print(f"[error] File {path} does not exist")
-                errors += 1
-            except OSError as error_message:
-                print(f"[error] System reported {error_message}")
-                errors += 1
+            continue
+
+        try:
+            fs.move_file(path, target_path)
+            print(f"[success] Moved: {path.name} -> {target_path}")
+            files_moved += 1
+            move_log.append({
+                "original": str(path),
+                "moved_to": str(target_path)
+            })
+        except PermissionError:
+            print(f"[error] Access denied to {path}")
+            errors += 1
+        except FileNotFoundError:
+            print(f"[error] File {path} does not exist")
+            errors += 1
+        except OSError as error_message:
+            print(f"[error] System reported {error_message}")
+            errors += 1
 
     if not runtime_config.dry_run and move_log:
         log_path = create_log_path(folder, runtime_config.log_dir_name)
@@ -196,52 +287,69 @@ def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
     print(f"Total skipped: {files_skipped}")
     print(f"Total errors: {errors}")
 
-def undo_recent_organize(folder: Path, args, runtime_config: RuntimeConfig) -> None:
+def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: str | None = None) -> None:
+    fs = FileSystemService(runtime_config)
 
-    if args.log_file:
-        log_path = folder / runtime_config.log_dir_name / args.log_file
+    if log_file:
+        log_path = folder / runtime_config.log_dir_name / log_file
         if not log_path.exists():
             print(f"[error] Log file not found: {log_path}")
             return
+        if runtime_config.debug_mode:
+            print(f"[debug] Using user-provided log file: {log_path}")
     else:
         log_path = get_latest_log(folder, runtime_config.log_dir_name)
         if log_path is None:
             print("[info] No log files found. Nothing to undo.")
             return
+        if runtime_config.debug_mode:
+            print(f"[debug] Using latest log file: {log_path}")
 
     move_log = load_log(log_path)
     if not move_log:
         print("[info] Log file is empty or unreadable. Nothing to undo.")
         return
 
-    undone = 0
+    entries_undone = 0
+    entries_skipped = 0
     errors = 0
     remaining_log = []
 
     for entry in reversed(move_log):
         original = Path(entry["original"])
         moved_to = Path(entry["moved_to"])
+        skip_reason = fs.skip_undo_move(original, moved_to)
 
-        if runtime_config.exclude_str is not None and (
-            runtime_config.exclude_str in original.name or runtime_config.exclude_str in moved_to.name
-        ):
-            continue
-        if not moved_to.exists():
-            print(f"[skip] Missing moved file: {moved_to}")
+        if skip_reason is not None:
             remaining_log.insert(0, entry)
+            entries_skipped += 1
+            if runtime_config.dry_run:
+                print(f"[dry-run] Skip: {original} ({skip_reason})")
+            elif runtime_config.debug_mode:
+                print(f"[debug] Skip: {original} ({skip_reason})")
             continue
 
-        restore_target = get_unique_path(original)
+        if not fs.path_exists(moved_to):
+            if runtime_config.debug_mode:
+                print(f"[debug] Missing moved file: {moved_to}")
+            remaining_log.insert(0, entry)
+            entries_skipped += 1
+            errors += 1
+            continue
+
+        restore_target = fs.get_unique_path(original)
+
+        if runtime_config.debug_mode:
+            print(f"[debug] Restore target resolved: {original} -> {restore_target}")
 
         try:
             if runtime_config.dry_run:
                 print(f"[dry-run] Undo: {moved_to} -> {restore_target}")
             else:
-                restore_target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(moved_to), str(restore_target))
+                fs.move_file(moved_to, restore_target)
                 print(f"[success] Undo: {moved_to.name} -> {restore_target}")
 
-            undone += 1
+            entries_undone += 1
 
         except Exception as error:
             print(f"[error] Could not undo {moved_to}: {error}")
@@ -260,7 +368,8 @@ def undo_recent_organize(folder: Path, args, runtime_config: RuntimeConfig) -> N
                 print(f"[warn] Could not remove log file: {error}")
 
     print("\nUndo complete!")
-    print(f"Total undone: {undone}")
+    print(f"Total undone: {entries_undone}")
+    print(f"Total skipped: {entries_skipped}")
     print(f"Total errors: {errors}")
 
 #endregion
@@ -408,11 +517,13 @@ def serialize_config(runtime_config: RuntimeConfig) -> dict:
 def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConfig:
     loaded_config = loaded_config or {}
 
+    debug_mode_arg = getattr(args, "debug_mode", None)
     dry_run_arg = getattr(args, "dry_run", None)
     sort_hidden_arg = getattr(args, "sort_hidden", None)
     exclude_str_arg = getattr(args, "exclude_str", None)
 
     return RuntimeConfig(
+        debug_mode=debug_mode_arg if debug_mode_arg is not None else loaded_config.get("debug_mode", default_config.debug_mode),
         script_name=loaded_config.get("script_name", default_config.script_name),
         script_version=loaded_config.get("script_version", default_config.script_version),
         log_dir_name=loaded_config.get("log_dir_name", default_config.log_dir_name),
@@ -492,7 +603,13 @@ def parse_args() -> argparse.Namespace:
         default="default",
         help="Use a specific configuration profile (default: 'default')"
     )
-    
+    global_group.add_argument(
+        "--debug-mode",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable or disable additional debug dialogues for actions"
+    )
+
     subparsers = parser.add_subparsers(dest="command", title="Available Commands", metavar="")
     shared_flags = argparse.ArgumentParser(add_help=False)
 
@@ -568,77 +685,39 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 #endregion
+
 #region utility-functions
 
 def pause_before_exit() -> None:
     if sys.stdin is not None and sys.stdin.isatty():
         input("\nPress Enter to exit...")
+#endregion
 
 #region main
 
 def main() -> None:
     args = parse_args()
-    
+
     config_name = args.config_name
     if not config_name.endswith(".json"):
         config_name += ".json"
-    
-    config_path = default_config.config_dir_path / config_name
 
+    config_path = default_config.config_dir_path / config_name
     loaded_config = load_config(config_path)
     runtime_config = build_runtime_config(args, loaded_config)
 
+    app = PrismApp(runtime_config, config_path)
+
     if args.command == "list-logs":
         list_logs(runtime_config.folder_path, runtime_config.log_dir_name)
-        return
     elif args.command == "undo":
         print(f"Working in {runtime_config.folder_path}")
-        undo_recent_organize(runtime_config.folder_path, args, runtime_config)
+        undo_recent_organize(runtime_config.folder_path, runtime_config, args.log_file)
     elif args.command == "organize":
         print(f"Working in {runtime_config.folder_path}")
         organize_files(runtime_config.folder_path, runtime_config)
     elif args.command == "config":
-        if args.create:
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            if config_path.exists():
-                print(f"[info] Config already exists: {config_path}")
-            else:
-                write_default_config(config_path)
-                print(f"[success] Wrote default config: {config_path}")
-        elif args.save:
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            write_config(config_path, runtime_config)
-            print(f"[success] Saved runtime config to: {config_path}")
-        elif args.list:
-            list_configs(default_config.config_dir_path)
-        elif args.path:
-            print(f"[info] Config path: {config_path}")
-            if config_path.exists():
-                print("[info] Config file exists.")
-            else:
-                print("[info] Config file does not exist yet.")
-        elif args.reset:
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            write_default_config(config_path)
-            print(f"[success] Reset config: {config_path}")
-        elif args.delete:
-            delete_config(config_path)
-        elif args.status:
-            show_config_status(runtime_config, config_path)
-        elif args.show:
-            print(json.dumps(serialize_config(runtime_config), indent=4))
-        else:
-            print("No config action provided.\n")
-            print("Examples:")
-            print(f"  {runtime_config.script_name} -c my_config config --create")
-            print(f"  {runtime_config.script_name} config --list")
-            print(f"  {runtime_config.script_name} config --save")
-            print(f"  {runtime_config.script_name} config --status")
-            print(f"  {runtime_config.script_name} config --show")
-            print(f"  {runtime_config.script_name} config --reset")
-            print(f"  {runtime_config.script_name} config --delete")
-            print(f"  {runtime_config.script_name} config --help")
-            pause_before_exit()
+        app.handle_config_command(args)
     else:
         print("No command provided.\n")
         print("Examples:")
@@ -649,7 +728,6 @@ def main() -> None:
         print(f"  {runtime_config.script_name} undo")
         print(f"  {runtime_config.script_name} --help")
         pause_before_exit()
-
 
 if __name__ == "__main__":
     main()
