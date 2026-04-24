@@ -114,7 +114,7 @@ Special thanks to my alpha testers and early contributors.
 ### Development Team
 
 - Lemuel ([@lemlnn](https://github.com)) - Lead Developer
-- Devin ([@DevinDaboi31415](https://github.com)) - Co-Developer & Outreach
+- Devin ([@DevinEats314](https://github.com)) - Co-Developer & Outreach
 
 ### Alpha Testers
 
@@ -126,6 +126,6 @@ Special thanks to my alpha testers and early contributors.
 
 - Enoch ([@Wavefire5201](https://github.com))
 - Gavin ([@dojozycknar10-player](https://github.com))
-- Devin ([@DevinDaboi31415](https://github.com))
+- Devin ([@DevinEats314](https://github.com))
 
 This project is licensed under the Apache License 2.0. See the LICENSE file for details.
