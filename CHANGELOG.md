@@ -1,4 +1,26 @@
 # Changelog  
+
+
+## PRISM [v1.2.5p] (4/24/26)
+
+PRISM v1.2.5p is the final pre-extension preparation release before the v1.3.x extension-system phase. It focuses on installability, project structure, and CLI usability by moving PRISM toward a normal package layout with a console command entry point. This release makes PRISM feel less like a standalone script and more like an actual installed command-line tool. Users can now run `prism` directly after local installation, and PRISM operates from the current working directory by default.
+
+Added
+
+- packaging groundwork through `pyproject.toml`
+- package structure under `src/prism_core/`
+- installable console command entry point: `prism`
+- editable local install support with `python -m pip install -e .`
+- `--delete-empty-folders` support for undo cleanup
+- empty-folder cleanup behavior after undo when enabled
+
+Changed
+
+- changed default working folder behavior to use the current working directory
+- moved PRISM closer to normal CLI-tool behavior
+- reduced dependence on direct script execution
+- updated usage flow from `python prism-core.py ...` toward `prism ...`
+- improved undo cleanup so restored folders can be removed when empty
   
 ## PRISM [v1.2.4p] (4/22/26)
 
