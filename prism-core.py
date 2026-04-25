@@ -33,12 +33,13 @@ DEFAULT_FILE_TYPES = {
 class DefaultConfig:
     debug_mode: bool = False
     script_name: str = Path(__file__).name
-    script_version: str = "1.2.4p"
+    script_version: str = "1.2.5p"
     log_dir_name: str = ".prism_logs"
-    folder_path: Path = Path(__file__).resolve().parent
+    folder_path: Path = field(default_factory=Path.cwd)
     config_dir_path: Path = Path.home() / ".prism_config"
     dry_run: bool = False
     sort_hidden: bool = False
+    delete_empty_folders: bool = False
     exclude_str: str | None = None
     default_file_types: dict[str, list[str]] = field(
         default_factory=lambda: {k: v[:] for k, v in DEFAULT_FILE_TYPES.items()}
@@ -54,6 +55,7 @@ class RuntimeConfig:
     config_dir_path: Path
     dry_run: bool
     sort_hidden: bool
+    delete_empty_folders: bool
     exclude_str: str | None
     default_file_types: dict[str, list[str]]
 
@@ -214,6 +216,31 @@ class FileSystemService:
         if target_path.exists():
             return self.get_unique_path(target_path)
         return target_path
+    
+    def delete_empty_folders(self, folder: Path) -> int:
+        deleted_count = 0
+
+        protected_names = {
+            self.config.log_dir_name,
+        }
+        for child in folder.iterdir():
+            if not child.is_dir():
+                continue
+            if child.name in protected_names:
+                continue
+            try:
+                next(child.iterdir())
+            except StopIteration:
+                try:
+                    child.rmdir()
+                    deleted_count += 1
+                    if self.config.debug_mode:
+                        print(f"[debug] Deleted empty folder: {child}")
+                except OSError as error:
+                    print(f"[warn] Could not delete empty folder {child}: {error}")
+            except OSError as error:
+                print(f"[warn] Could not inspect folder {child}: {error}")
+        return deleted_count    
 
     @staticmethod
     def path_exists(path: Path) -> bool:
@@ -287,7 +314,7 @@ def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
     print(f"Total skipped: {files_skipped}")
     print(f"Total errors: {errors}")
 
-def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: str | None = None) -> None:
+def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: str | None = None, delete_empty_folders: bool = False) -> None:
     fs = FileSystemService(runtime_config)
 
     if log_file:
@@ -367,10 +394,19 @@ def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: 
             except Exception as error:
                 print(f"[warn] Could not remove log file: {error}")
 
+    empty_folders_deleted = 0
+
+    if runtime_config.delete_empty_folders and not runtime_config.dry_run:
+        empty_folders_deleted = fs.delete_empty_folders(folder)
+        if empty_folders_deleted:
+            print(f"\n[cleanup] Deleted empty folders: {empty_folders_deleted}")
+
     print("\nUndo complete!")
     print(f"Total undone: {entries_undone}")
     print(f"Total skipped: {entries_skipped}")
     print(f"Total errors: {errors}")
+    if delete_empty_folders:
+        print(f"Empty folders deleted: {empty_folders_deleted}")
 
 #endregion
 
@@ -521,6 +557,7 @@ def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConf
     dry_run_arg = getattr(args, "dry_run", None)
     sort_hidden_arg = getattr(args, "sort_hidden", None)
     exclude_str_arg = getattr(args, "exclude_str", None)
+    delete_empty_folders_arg = getattr(args, "delete_empty_folders", None)
 
     return RuntimeConfig(
         debug_mode=debug_mode_arg if debug_mode_arg is not None else loaded_config.get("debug_mode", default_config.debug_mode),
@@ -532,6 +569,7 @@ def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConf
         dry_run=dry_run_arg if dry_run_arg is not None else loaded_config.get("dry_run", default_config.dry_run),
         sort_hidden=sort_hidden_arg if sort_hidden_arg is not None else loaded_config.get("sort_hidden", default_config.sort_hidden),
         exclude_str=exclude_str_arg if exclude_str_arg is not None else loaded_config.get("exclude_str", default_config.exclude_str),
+        delete_empty_folders=(delete_empty_folders_arg if delete_empty_folders_arg is not None else loaded_config.get("delete_empty_folders", default_config.delete_empty_folders)),
         default_file_types=loaded_config.get(
             "default_file_types",
             {k: v[:] for k, v in default_config.default_file_types.items()}
@@ -552,12 +590,13 @@ def build_config_status(runtime_config: RuntimeConfig, config_path: Path) -> lis
 
     lines.append("")
     lines.append("Current runtime settings:")
-    lines.append(f"  Script version : {runtime_config.script_version}")
-    lines.append(f"  Working folder : {runtime_config.folder_path}")
-    lines.append(f"  Log directory  : {runtime_config.log_dir_name}")
-    lines.append(f"  Dry run        : {runtime_config.dry_run}")
-    lines.append(f"  Sort hidden    : {runtime_config.sort_hidden}")
-    lines.append(f"  Exclude string : {runtime_config.exclude_str if runtime_config.exclude_str is not None else 'None'}")
+    lines.append(f"  Script version      : {runtime_config.script_version}")
+    lines.append(f"  Working folder      : {runtime_config.folder_path}")
+    lines.append(f"  Log directory       : {runtime_config.log_dir_name}")
+    lines.append(f"  Dry run             : {runtime_config.dry_run}")
+    lines.append(f"  Sort hidden         : {runtime_config.sort_hidden}")
+    lines.append(f"  Delete empty folders: {runtime_config.delete_empty_folders}")
+    lines.append(f"  Exclude string      : {runtime_config.exclude_str if runtime_config.exclude_str is not None else 'None'}")
     lines.append(f"  File categories: {len(runtime_config.default_file_types)}")
 
     return lines
@@ -648,6 +687,12 @@ def parse_args() -> argparse.Namespace:
         metavar="FILENAME",
         type=str,
         help="Specify a specific log to undo"
+    )
+    undo_parser.add_argument(
+        "--delete-empty-folders",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Delete empty category folders after undo completes"
     )
 
     subparsers.add_parser(
