@@ -14,6 +14,11 @@ from datetime import datetime
 # - constants: UPPER_SNAKE_CASE
 # - variables/functions: snake_case
 # - classes: PascalCase
+
+# contributors as of now:
+    #lemlnn/Lemuel
+    #DevinDaboi314159/Devin
+    
 #endregion
 
 #region default-configs
@@ -30,7 +35,7 @@ DEFAULT_FILE_TYPES = {
 }
 
 @dataclass(frozen=True)
-class DefaultConfig:
+class DefaultConfig: #the default settings that the code hardcodes by default
     debug_mode: bool = False
     script_name: str = Path(__file__).name
     script_version: str = "1.2.5p"
@@ -46,7 +51,7 @@ class DefaultConfig:
     )
 
 @dataclass
-class RuntimeConfig:
+class RuntimeConfig: #the user specified overrides/settings per run, if not used, fall back to default settings
     debug_mode: bool
     script_name: str
     script_version: str
@@ -64,12 +69,12 @@ default_config = DefaultConfig()
 
 #region prism-api
 
-class PrismApp:
+class PrismApp: #general command routing for the major commands
     def __init__(self, runtime_config: RuntimeConfig, config_path: Path):
         self.config = runtime_config
         self.config_path = config_path
 
-    def handle_config_command(self, args: argparse.Namespace) -> None:
+    def handle_config_command(self, args: argparse.Namespace) -> None: #creates the default config based on the DefaultConfig class
         if args.create:
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
             if self.config_path.exists():
@@ -78,7 +83,7 @@ class PrismApp:
                 write_default_config(self.config_path)
                 print(f"[success] Wrote default config: {self.config_path}")
 
-        elif args.save:
+        elif args.save: #various arguments for the undo config functionality
             self.config_path.parent.mkdir(parents=True, exist_ok=True)
             write_config(self.config_path, self.config)
             print(f"[success] Saved runtime config to: {self.config_path}")
@@ -107,7 +112,7 @@ class PrismApp:
         elif args.show:
             print(json.dumps(serialize_config(self.config), indent=4))
 
-        else:
+        else: #help section for built in example commands
             print("No config action provided.\n")
             print("Examples:")
             print(f"  {self.config.script_name} -c my_config config --create")
@@ -120,12 +125,12 @@ class PrismApp:
             print(f"  {self.config.script_name} config --help")
             pause_before_exit()
 
-class FileSystemService:
+class FileSystemService: #file sorting methods accessed by undo and organize commands
     def __init__(self, config: RuntimeConfig):
         self.config = config #devnote: access config here via self.config
 
     @staticmethod
-    def iterate_entries(path: Path):
+    def iterate_entries(path: Path): #a more ram efficient method of os.listdir
         try:
             with os.scandir(path) as stream:
                 yield from stream
@@ -137,7 +142,7 @@ class FileSystemService:
             print(f"[error] System reported {error_message}")
 
     @staticmethod
-    def get_entry_type(entry) -> str:
+    def get_entry_type(entry) -> str: #figures out what type of classification an entry is
         try:
             if entry.is_dir(follow_symlinks=False):
                 return "dir"
@@ -149,7 +154,7 @@ class FileSystemService:
             print(f"[error] System reported {error_message}")
             return "error"
 
-    def collect_top_level_files(self, folder: Path) -> list[Path]:
+    def collect_top_level_files(self, folder: Path) -> list[Path]: #takes the top level files (no subfolders) of a directory and puts it into an array
         files = []
         for entry in self.iterate_entries(folder):
             if self.get_entry_type(entry) != "file":
@@ -160,7 +165,7 @@ class FileSystemService:
         return files
 
     @staticmethod
-    def get_unique_path(target_path: Path) -> Path:
+    def get_unique_path(target_path: Path) -> Path: #duplicate handling, for example file.txt will be set to file(1).txt if file.txt path is already occupied
         if not target_path.exists():
             return target_path
 
@@ -176,40 +181,40 @@ class FileSystemService:
             counter += 1
 
     @staticmethod
-    def is_hidden(path: Path) -> bool:
+    def is_hidden(path: Path) -> bool: #helper function determining if a entry is hidden
         return path.name.startswith(".")
     
     @staticmethod
-    def get_extension(path: Path) -> str:
+    def get_extension(path: Path) -> str: #helper function determining what extension a entry is, such as .txt or .jpeg
         return path.suffix.lower()
 
     @staticmethod
-    def get_target_folder(extension: str, file_types: dict[str, list[str]]) -> str:
+    def get_target_folder(extension: str, file_types: dict[str, list[str]]) -> str: #takes the extension, looks at the file categories, and then returns the category to put in
         for folder_name, extensions in file_types.items():
             if extension in extensions:
                 return folder_name
         return "Others"
     
-    def classify_file(self, path: Path) -> str:
+    def classify_file(self, path: Path) -> str: #bundles get_target_folder and get_extension together
         extension = self.get_extension(path)
         folder_name  = self.get_target_folder(extension, self.config.default_file_types)
         return folder_name
     
-    def skip_file(self, path: Path) -> str | None:
+    def skip_file(self, path: Path) -> str | None: #organize command variant of determining if a file should be skipped or not
         if self.config.exclude_str is not None and self.config.exclude_str in path.name:
             return "matches exclude string"
         elif not self.config.sort_hidden and self.is_hidden(path):
             return "is hidden file"
         return None
     
-    def skip_undo_move(self, original_path: Path, moved_path: Path) -> str | None:
+    def skip_undo_move(self, original_path: Path, moved_path: Path) -> str | None: #undo command variant of determining if a file should be skipped or not
         if self.config.exclude_str is not None and (
             self.config.exclude_str in original_path.name or self.config.exclude_str in moved_path.name
         ):
             return "matches exclude string"
         return None
 
-    def build_target_path(self, path: Path, folder: Path) -> Path:
+    def build_target_path(self, path: Path, folder: Path) -> Path: #bundles most of the helper functions together to form the final path
         folder_name = self.classify_file(path)
         target_path = folder / folder_name / path.name
 
@@ -217,7 +222,7 @@ class FileSystemService:
             return self.get_unique_path(target_path)
         return target_path
     
-    def delete_empty_folders(self, folder: Path) -> int:
+    def delete_empty_folders(self, folder: Path) -> int: #removes empty folders when using the undo command, default False
         deleted_count = 0
 
         protected_names = {
@@ -243,18 +248,18 @@ class FileSystemService:
         return deleted_count    
 
     @staticmethod
-    def path_exists(path: Path) -> bool:
+    def path_exists(path: Path) -> bool: #helper function for figuring out if a path is occupied or not
         return path.exists()
 
     @staticmethod
-    def move_file(source: Path, destination: Path) -> None:
+    def move_file(source: Path, destination: Path) -> None: #the actual moving files function called by the commands
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(source), str(destination))
 
 #endregion
 
 #region main-functions
-def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
+def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None: #organize command logic
     fs = FileSystemService(runtime_config)
     files = fs.collect_top_level_files(folder)
 
@@ -276,7 +281,7 @@ def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
 
         target_path = fs.build_target_path(path, folder)
 
-        if runtime_config.debug_mode:
+        if runtime_config.debug_mode: #debug mode shows further info, helpful for figuring out errors for later
             category = fs.classify_file(path)
             print(f"[debug] Classified: {path.name} -> {category}")
             print(f"[debug] Target path: {target_path}")
@@ -304,20 +309,20 @@ def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None:
             print(f"[error] System reported {error_message}")
             errors += 1
 
-    if not runtime_config.dry_run and move_log:
+    if not runtime_config.dry_run and move_log: #if the function is not on preview mode, save log
         log_path = create_log_path(folder, runtime_config.log_dir_name)
         save_log(log_path, move_log)
         print(f"\n[log] Saved run log: {log_path}")
 
-    print("\nDone!")
+    print("\nDone!") #print output for the summary
     print(f"Total moved: {files_moved}")
     print(f"Total skipped: {files_skipped}")
     print(f"Total errors: {errors}")
 
-def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: str | None = None, delete_empty_folders: bool = False) -> None:
+def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: str | None = None) -> None: #undo command logic
     fs = FileSystemService(runtime_config)
 
-    if log_file:
+    if log_file: #if user provides log file to undo, figure out if its valid, if so, use the log file instead of most recent
         log_path = folder / runtime_config.log_dir_name / log_file
         if not log_path.exists():
             print(f"[error] Log file not found: {log_path}")
@@ -342,7 +347,7 @@ def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: 
     errors = 0
     remaining_log = []
 
-    for entry in reversed(move_log):
+    for entry in reversed(move_log): #undo logic by reversing the log
         original = Path(entry["original"])
         moved_to = Path(entry["moved_to"])
         skip_reason = fs.skip_undo_move(original, moved_to)
@@ -366,7 +371,7 @@ def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: 
 
         restore_target = fs.get_unique_path(original)
 
-        if runtime_config.debug_mode:
+        if runtime_config.debug_mode: #debug mode additional dialogues
             print(f"[debug] Restore target resolved: {original} -> {restore_target}")
 
         try:
@@ -383,8 +388,8 @@ def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: 
             errors += 1
             remaining_log.insert(0, entry)
 
-    if not runtime_config.dry_run:
-        if remaining_log:
+    if not runtime_config.dry_run: 
+        if remaining_log: #if there is a remaining log, undo and leave the incomplete fragments behind
             save_log(log_path, remaining_log)
             print(f"\n[log] Updated incomplete undo log: {log_path}")
         else:
@@ -396,40 +401,40 @@ def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: 
 
     empty_folders_deleted = 0
 
-    if runtime_config.delete_empty_folders and not runtime_config.dry_run:
+    if runtime_config.delete_empty_folders and not runtime_config.dry_run: #deletes empty folders after undo command if the setting is active
         empty_folders_deleted = fs.delete_empty_folders(folder)
         if empty_folders_deleted:
             print(f"\n[cleanup] Deleted empty folders: {empty_folders_deleted}")
 
-    print("\nUndo complete!")
+    print("\nUndo complete!") #print output for the summary
     print(f"Total undone: {entries_undone}")
     print(f"Total skipped: {entries_skipped}")
     print(f"Total errors: {errors}")
-    if delete_empty_folders:
+    if runtime_config.delete_empty_folders:
         print(f"Empty folders deleted: {empty_folders_deleted}")
 
 #endregion
 
 #region logging-functions
 
-def check_log_dir(folder: Path, log_dir_name: str) -> Path:
+def check_log_dir(folder: Path, log_dir_name: str) -> Path: #making sure a log folder exists and giving the path, creates folder if needed
     log_dir = folder / log_dir_name
     log_dir.mkdir(exist_ok=True)
     return log_dir
 
-def create_log_path(folder: Path, log_dir_name: str) -> Path:
+def create_log_path(folder: Path, log_dir_name: str) -> Path: #makes a unique log based on the date so logs dont overwrite eachother
     log_dir = check_log_dir(folder, log_dir_name)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return log_dir / f"organize_log_{timestamp}.json"
 
-def save_log(log_path: Path, moves: list[dict]) -> None:
+def save_log(log_path: Path, moves: list[dict]) -> None: #attempts to save the log file in JSON
     try:
         with log_path.open("w", encoding="utf-8") as f:
             json.dump(moves, f, indent=2)
     except Exception as error:
         print(f"[error] Could not save log file: {error}")
 
-def load_log(log_path: Path) -> list[dict]:
+def load_log(log_path: Path) -> list[dict]: #loads a log json
     try:
         with log_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
@@ -438,7 +443,7 @@ def load_log(log_path: Path) -> list[dict]:
         print(f"[warn] Could not read log file: {error}")
         return []
 
-def get_latest_log(root: Path, log_dir_name: str) -> Path | None:
+def get_latest_log(root: Path, log_dir_name: str) -> Path | None: #figures out the most recent undo run log, if any
     log_dir = root / log_dir_name
     if not log_dir.exists():
         return None
@@ -446,7 +451,7 @@ def get_latest_log(root: Path, log_dir_name: str) -> Path | None:
     logs = sorted(log_dir.glob("organize_log_*.json"))
     return logs[-1] if logs else None
 
-def list_logs(folder_path: Path, log_dir_name: str) -> None:
+def list_logs(folder_path: Path, log_dir_name: str) -> None: #prints all available logs
     log_dir = folder_path / log_dir_name
     if not log_dir.exists():
         print("[info] No log directory found.")
@@ -461,7 +466,7 @@ def list_logs(folder_path: Path, log_dir_name: str) -> None:
     for log in logs:
         print(f" - {log.name}")
 
-def list_configs(config_dir: Path) -> None:
+def list_configs(config_dir: Path) -> None: #helper function to determine if the config directory exists or not
     if not config_dir.exists():
         print("[info] No config directory found.")
         return
@@ -479,7 +484,7 @@ def list_configs(config_dir: Path) -> None:
 
 #region config-functions
 
-def check_config_path(target_path: Path) -> Path:
+def check_config_path(target_path: Path) -> Path: #pick a new extension name if one is already taken, making sure path names are valid
     if not target_path.exists():
         return target_path
     extension = target_path.suffix
@@ -497,27 +502,27 @@ def check_config_path(target_path: Path) -> Path:
         if not input_target_path.exists():
             return input_target_path
 
-def get_config_file_path(config_dir: Path, name: str) -> Path:
+def get_config_file_path(config_dir: Path, name: str) -> Path: #gets the path and runs checking function
     config_dir.mkdir(parents=True, exist_ok=True)
     target_path = config_dir / f"{name}.json"
     return check_config_path(target_path)
 
-def serialize_default_config() -> dict:
+def serialize_default_config() -> dict: #turns default config object into a dictionry and turns paths to strings
     data = asdict(default_config)
     for key, value in data.items():
         if isinstance(value, Path):
             data[key] = str(value)
     return data
 
-def write_default_config(config_path: Path) -> None:
+def write_default_config(config_path: Path) -> None: #writes the default config as json
     with config_path.open("w", encoding="utf-8") as json_output:
         json.dump(serialize_default_config(), json_output, indent=4)
 
-def write_config(config_path: Path, runtime_config: RuntimeConfig) -> None:
+def write_config(config_path: Path, runtime_config: RuntimeConfig) -> None: #writes current runtime config as json
     with config_path.open("w", encoding="utf-8") as json_output:
         json.dump(serialize_config(runtime_config), json_output, indent=4)
 
-def delete_config(config_path: Path) -> None:
+def delete_config(config_path: Path) -> None: #deletes a config with user permission
     if not config_path.exists():
         print(f"[error] Config file does not exist: {config_path}")
         return
@@ -532,7 +537,7 @@ def delete_config(config_path: Path) -> None:
     else:
         print("[info] Deletion cancelled.")
 
-def load_config(config_path: Path) -> dict:
+def load_config(config_path: Path) -> dict: #reads a json config and returns it as a dictioary
     try:
         with config_path.open("r", encoding="utf-8") as json_input:
             data = json.load(json_input)
@@ -543,14 +548,14 @@ def load_config(config_path: Path) -> dict:
         print(f"[warn] Could not read config file: {error}")
         return {}
     
-def serialize_config(runtime_config: RuntimeConfig) -> dict:
+def serialize_config(runtime_config: RuntimeConfig) -> dict: #turns runtime config into a dictionary
     data = asdict(runtime_config)
     for key, value in data.items():
         if isinstance(value, Path):
             data[key] = str(value)
     return data
 
-def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConfig:
+def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConfig: #main building process for the current runtime settings
     loaded_config = loaded_config or {}
 
     debug_mode_arg = getattr(args, "debug_mode", None)
@@ -576,7 +581,7 @@ def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConf
         ),
     )
 
-def build_config_status(runtime_config: RuntimeConfig, config_path: Path) -> list[str]:
+def build_config_status(runtime_config: RuntimeConfig, config_path: Path) -> list[str]: #shows current config settings to the user
     lines = []
 
     lines.append("PRISM Config Status")
@@ -601,7 +606,7 @@ def build_config_status(runtime_config: RuntimeConfig, config_path: Path) -> lis
 
     return lines
 
-def show_config_status(runtime_config: RuntimeConfig, config_path: Path) -> None:
+def show_config_status(runtime_config: RuntimeConfig, config_path: Path) -> None: #prints return of build_config_status
     for line in build_config_status(runtime_config, config_path):
         print(line)
 
@@ -609,7 +614,7 @@ def show_config_status(runtime_config: RuntimeConfig, config_path: Path) -> None
 
 #region args-functions
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> argparse.Namespace: #commands menu and usage help for the user
     usage_info = "%(prog)s [options] {organize,undo,list-logs,config} ..."
     
     example_usage = textwrap.dedent("""
@@ -625,9 +630,9 @@ def parse_args() -> argparse.Namespace:
           %(prog)s -c photography organize
           %(prog)s config --list
           %(prog)s undo
-    """)
+    """) #example command usage for undo and organize functions
 
-    parser = argparse.ArgumentParser(
+    parser = argparse.ArgumentParser( #the main description of the utility
         description="PRISM: A smart file organizer that categorizes files by type.",
         usage=usage_info,
         epilog=example_usage,
@@ -635,14 +640,14 @@ def parse_args() -> argparse.Namespace:
     )
 
     global_group = parser.add_argument_group("Global Options")
-    global_group.add_argument(
+    global_group.add_argument( #loads the user specified config into runtime
         "-c", "--config",
         metavar="NAME",
         dest="config_name",
         default="default",
         help="Use a specific configuration profile (default: 'default')"
     )
-    global_group.add_argument(
+    global_group.add_argument( #runs a function with debug mode
         "--debug-mode",
         action=argparse.BooleanOptionalAction,
         default=None,
@@ -652,67 +657,74 @@ def parse_args() -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", title="Available Commands", metavar="")
     shared_flags = argparse.ArgumentParser(add_help=False)
 
-    shared_flags.add_argument(
+    shared_flags.add_argument( #sets the action to preview instead of direct execution
         "--dry-run",
         action="store_true",
         default=None,
         help="Preview changes without moving any files"
     )
-    shared_flags.add_argument(
+    shared_flags.add_argument( #flag to skip specific files with a specified string
         "--exclude-str",
         metavar="TEXT",
         type=str,
         help="Skip files containing this specific text"
     )
 
-    organize_parser = subparsers.add_parser(
+    organize_parser = subparsers.add_parser( #organize function
         "organize",
         parents=[shared_flags],
         help="Sort files into folders"
     )
-    organize_parser.add_argument(
+    organize_parser.add_argument( #flag to sort hidden files
         "--sort-hidden",
         action="store_true",
         default=None,
         help="Include hidden files (starting with '.')"
     )
 
-    undo_parser = subparsers.add_parser(
+    undo_parser = subparsers.add_parser( #undo function
         "undo",
         parents=[shared_flags],
         help="Reverse a previous run"
     )
-    undo_parser.add_argument(
+    undo_parser.add_argument( #loads the user specified undo log for the undo runtime
         "--log-file",
         metavar="FILENAME",
         type=str,
         help="Specify a specific log to undo"
     )
-    undo_parser.add_argument(
+    undo_parser.add_argument( #flag to delete empty folders after sorting
         "--delete-empty-folders",
         action=argparse.BooleanOptionalAction,
         default=None,
         help="Delete empty category folders after undo completes"
     )
 
-    subparsers.add_parser(
+    subparsers.add_parser( #listing logs history
         "list-logs",
         help="View organization history"
     )
 
-    config_parser = subparsers.add_parser(
+    config_parser = subparsers.add_parser( #config function
         "config",
         parents=[shared_flags],
         help="Manage configuration profiles"
     )
-    config_parser.add_argument(
+    config_parser.add_argument( #retains the sort hidden flag into the created config profile
         "--sort-hidden",
         action="store_true",
         default=None,
         help="Include hidden files (starting with '.')"
     )
+    config_parser.add_argument( #retains the delete empty folders flag into the created config profile
+        "--delete-empty-folders",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Set whether undo deletes empty category folders after restoring files"
+    )
+    
     config_actions = config_parser.add_mutually_exclusive_group()
-    config_actions.add_argument("--create", action="store_true", help="Initialize a new config file")
+    config_actions.add_argument("--create", action="store_true", help="Initialize a new config file") #a few basic flags
     config_actions.add_argument("--save", action="store_true", help="Save current settings to profile")
     config_actions.add_argument("--list", action="store_true", help="List all saved profiles")
     config_actions.add_argument("--status", action="store_true", help="Show current profile summary")
@@ -740,7 +752,7 @@ def pause_before_exit() -> None:
 
 #region main
 
-def main() -> None:
+def main() -> None: #main script, runs commands based on user input
     args = parse_args()
 
     config_name = args.config_name
@@ -753,18 +765,18 @@ def main() -> None:
 
     app = PrismApp(runtime_config, config_path)
 
-    if args.command == "list-logs":
+    if args.command == "list-logs": #routes to the logs functionality and command
         list_logs(runtime_config.folder_path, runtime_config.log_dir_name)
-    elif args.command == "undo":
+    elif args.command == "undo": #routes to the undo functionality
         print(f"Working in {runtime_config.folder_path}")
         undo_recent_organize(runtime_config.folder_path, runtime_config, args.log_file)
-    elif args.command == "organize":
+    elif args.command == "organize": #routes to the organize functionality
         print(f"Working in {runtime_config.folder_path}")
         organize_files(runtime_config.folder_path, runtime_config)
-    elif args.command == "config":
+    elif args.command == "config": #routes to config options
         app.handle_config_command(args)
     else:
-        print("No command provided.\n")
+        print("No command provided.\n") #commands menu and usage help for the user
         print("Examples:")
         print(f"  {runtime_config.script_name} -c my_config organize")
         print(f"  {runtime_config.script_name} config")
