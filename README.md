@@ -40,13 +40,12 @@ Instead of only moving files, it also supports:
 
 ## Install
 
-PRISM currently supports local editable installation from the repository.
+PRISM can be installed from the GitHub source.
 
 ```bash
 git clone https://github.com/lemlnn/prism-core.git
 cd prism-core
-python -m pip install -e .
-```
+python -m pip install .
 
 After installation, the `prism` command should be available:
 
