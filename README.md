@@ -46,7 +46,7 @@ PRISM can be installed from the GitHub source.
 git clone https://github.com/lemlnn/prism-core.git
 cd prism-core
 python -m pip install .
-
+```
 After installation, the `prism` command should be available:
 
 ```bash
