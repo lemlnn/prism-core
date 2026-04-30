@@ -1,0 +1,10 @@
+LICENSE
+README.md
+pyproject.toml
+src/prism_core/__init__.py
+src/prism_core/cli.py
+src/prism_core.egg-info/PKG-INFO
+src/prism_core.egg-info/SOURCES.txt
+src/prism_core.egg-info/dependency_links.txt
+src/prism_core.egg-info/entry_points.txt
+src/prism_core.egg-info/top_level.txt
