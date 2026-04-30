@@ -1,0 +1,317 @@
+# PRISM Extensions
+
+## Status
+
+The PRISM extension system is experimental as of `v1.3.0-devt2a`.
+
+Extensions are disabled by default. The API may change or be added to before the stable v1.3.x release.
+
+## Core Idea
+
+Extensions suggest behavior, while core still retains these functionalities:
+
+- file movement
+- path validation
+- duplicate-safe naming
+- logs
+- undo
+- safety checks
+
+This allows extensions to influence sorting without bypassing PRISM’s safety model.
+
+## Enable Extensions
+
+Enable extensions for one run:
+
+```bash
+prism --extensions-enabled organize --dry-run
+```
+
+Use a custom extension directory:
+
+```bash
+prism --extensions-enabled --extensions-dir ./extensions organize --dry-run
+```
+
+Save extension settings into a profile:
+
+```bash
+prism -c dev config --save --extensions-enabled --extensions-dir ./extensions
+```
+
+Run later with that profile:
+
+```bash
+prism -c dev organize --dry-run
+```
+
+Default extension directory:
+
+```text
+~/.prism_extensions
+```
+
+## Extension Loading
+
+PRISM loads `.py` files from the selected extension directory.
+
+Example:
+
+```text
+~/.prism_extensions/
+├── photo_sorter.py
+├── temp_file_skipper.py
+└── _disabled_example.py
+```
+
+Files starting with `_` are ignored.
+
+If an extension fails to load, PRISM prints a warning and continues.
+
+## Extension Metadata
+
+Extensions may define:
+
+```python
+EXTENSION_NAME = "MyExtension"
+EXTENSION_PRIORITY = 50
+```
+
+`EXTENSION_NAME` is used in debug output and warnings.
+
+`EXTENSION_PRIORITY` controls hook order. Higher priority runs first.
+
+Suggested priority ranges:
+
+- `100` = strongest/specific workflow extensions
+- `90` = safety/skip filters
+- `80` = metadata/photo/date sorters
+- `50` = school/project/finance keyword sorters
+- `10` = expanded file type packs
+- `0` = default
+
+## Current Hooks
+
+`v1.3.0-devt2a` supports two hooks:
+
+- `file_should_process`
+- `file_target_resolve`
+
+Return `None` when your extension has no suggestion.
+
+## `file_should_process`
+
+Use this hook when an extension wants to suggest whether a file should be processed.
+
+Example:
+
+```python
+EXTENSION_NAME = "TempFileSkipper"
+EXTENSION_PRIORITY = 90
+
+def file_should_process(context):
+    if context.file_name.endswith(".tmp"):
+        return {
+            "process": False,
+            "reason": "temporary file"
+        }
+
+    return None
+```
+
+Context fields:
+
+```text
+source_path
+file_name
+extension
+is_hidden
+working_folder
+dry_run
+```
+
+Return format:
+
+```python
+{
+    "process": False,
+    "reason": "why this file should be skipped"
+}
+```
+
+Rules:
+
+- `process` must be a boolean.
+- `reason` should be a short string.
+- `None` means the extension has no opinion.
+- The first valid suggestion wins based on priority order.
+
+If `process` is `False`, PRISM skips the file.
+
+If `process` is `True`, PRISM continues processing.
+
+## `file_target_resolve`
+
+Use this hook when an extension wants to suggest a different target category.
+
+Example:
+
+```python
+EXTENSION_NAME = "MarkdownSorter"
+EXTENSION_PRIORITY = 50
+
+def file_target_resolve(context):
+    if context.extension == ".md":
+        return {
+            "category": "Documents/Markdown",
+            "reason": "markdown file"
+        }
+
+    return None
+```
+
+Context fields:
+
+```text
+source_path
+file_name
+extension
+original_category
+working_folder
+```
+
+Return format:
+
+```python
+{
+    "category": "Documents/Markdown",
+    "reason": "why this category was selected"
+}
+```
+
+Rules:
+
+- `category` must be a string.
+- `category` must be a safe relative path.
+- `reason` should be a short string.
+- `None` means the extension has no opinion.
+- The first valid suggestion wins based on priority order.
+
+## Category Safety
+
+Extension-provided categories must be safe relative paths.
+
+Allowed:
+
+```text
+Documents/Markdown
+Images/Sony
+School/AP_Bio
+```
+
+Blocked:
+
+```text
+../OutsideFolder
+/home/user/Desktop
+C:/Users/name/Desktop
+.
+empty string
+```
+
+Unsafe suggestions are ignored, which prevents extensions from routing files outside the working folder or using dangerous paths.
+
+## Hook Order
+
+Extensions are sorted by:
+
+1. `EXTENSION_PRIORITY`
+2. `EXTENSION_NAME`
+
+Higher priority extensions run first, and this extension priority system allows certain extensions to take over overlapping roles.
+
+Example:
+
+```python
+EXTENSION_PRIORITY = 90
+```
+
+runs before:
+
+```python
+EXTENSION_PRIORITY = 50
+```
+
+## Debugging Extensions
+
+Use debug mode:
+
+```bash
+prism --debug-mode --extensions-enabled organize --dry-run
+```
+
+Debug output can show:
+
+- extension load order
+- extension priority
+- extension skip suggestions
+- extension target suggestions
+- invalid suggestion warnings
+- hook failures
+
+## Minimal Extension Template
+
+```python
+EXTENSION_NAME = "ExampleExtension"
+EXTENSION_PRIORITY = 50
+
+def file_should_process(context):
+    return None
+
+def file_target_resolve(context):
+    return None
+```
+
+## Example: Sort Markdown Files
+
+```python
+EXTENSION_NAME = "MarkdownSorter"
+EXTENSION_PRIORITY = 50
+
+def file_target_resolve(context):
+    if context.extension == ".md":
+        return {
+            "category": "Documents/Markdown",
+            "reason": "markdown file"
+        }
+
+    return None
+```
+
+## Example: Skip Temporary Files
+
+```python
+EXTENSION_NAME = "TempFileSkipper"
+EXTENSION_PRIORITY = 90
+
+def file_should_process(context):
+    if context.file_name.endswith(".tmp"):
+        return {
+            "process": False,
+            "reason": "temporary file"
+        }
+
+    return None
+```
+
+## Development Notes
+
+This extension system is not stable yet. For now, extensions should stay simple, local, and suggestion-based.
+
+Expected future work:
+
+- more hooks
+- better examples
+- possible extension manifests
+- extension-defined settings
+- stronger extension documentation

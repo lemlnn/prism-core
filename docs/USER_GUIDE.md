@@ -2,179 +2,390 @@
 
 ## Overview
 
-PRISM is a Python CLI file organizer for top-level file cleanup.
+PRISM is a Python CLI folder cleanup tool.
 
-It supports:
+It can:
 
-- category-based file sorting
-- dry-run preview
-- JSON run logs
-- undo
-- persistent config profiles
-- debug tracing
+- sort top-level files into category folders
+- preview changes before moving files
+- save JSON run logs
+- undo previous organize runs
+- use persistent config profiles
+- show debug output
+- run experimental extensions
 
-## Mental Model
+PRISM works from the current working directory unless the saved config says otherwise.
 
-PRISM works in three layers:
-
-1. built-in defaults
-2. selected config profile
-3. CLI flag overrides
-
-At runtime, CLI flags temporarily override profile values. If you use `config --save`, the current runtime state gets written back into the selected profile.
-
-## Basic Commands
-
-- Organize files:
-`python prism-core.py organize`
-
-- Preview without moving files:
-`python prism-core.py organize --dry-run`
-
-- Run organize with debug output:
-`python prism-core.py --debug-mode organize`
-
-- Undo the most recent run:
-`python prism-core.py undo`
-
-- Run undo with debug output:
-`python prism-core.py --debug-mode undo`
-
-- List previous run logs:
-`python prism-core.py list-logs`
-
-## Config Profiles
-
-- Profiles are stored in:
-`~/.prism_config/`
-
-- The default profile is:
-`default.json`
-
-- Select a profile globally with:
-`-c PROFILE_NAME`  `--config PROFILE_NAME`
-
-- Example:
-`python prism-core.py -c photography organize`
-
-- This uses:
-`~/.prism_config/photography.json`
-
-## Profile Commands
-
-- Create the default profile:
-`python prism-core.py config --create`
-
-- Create a named profile:
-`python prism-core.py -c photography config --create`
-
-- List available profiles:
-`python prism-core.py config --list`
-
-- Show the selected profile path:
-`python prism-core.py -c photography config --path`
-
-- Show an organized config summary:
-`python prism-core.py -c photography config --status`
-
-- Show the raw config JSON:
-`python prism-core.py -c photography config --show`
-
-- Reset the selected profile to defaults:
-`python prism-core.py -c photography config --reset`
-
-- Delete the selected profile:
-`python prism-core.py -c photography config --delete`
-
-## Saving Runtime Settings into a Profile
-
-- Example:
-`python prism-core.py -c photography config --save --dry-run --exclude-str "Draft"`
-
-- Another example:
-`python prism-core.py -c dev config --save --debug-mode`
-
-This saves the current runtime settings into the selected profile.
-
-### What each part means
-
-- `python prism-core.py`  
-runs PRISM
-
-- `-c photography`  
-selects the `photography` profile
-
-- `config`  
-enters config-management mode
-
-- `--save`  
-writes the current runtime state back into the selected profile
-
-- `--dry-run`  
-sets `dry_run = true` before saving
-
-- `--exclude-str "Draft"`  
-sets `exclude_str = "Draft"` before saving
-
-- `--debug-mode`  
-sets `debug_mode = true` before saving
-
-### What this does
-
-1. PRISM loads the selected profile
-2. CLI flags temporarily override that profile
-3. `config --save` writes the final runtime state back into the profile
-
-So after running the command, the selected profile can save values like:
-
-- `dry_run: true`
-- `exclude_str: "Draft"`
-- `debug_mode: true`
-
-## Runtime Setting Order
+## Runtime Model
 
 PRISM resolves settings in this order:
 
 1. built-in defaults
 2. selected config profile
-3. CLI flag overrides
+3. CLI flags
 
-This applies to settings such as:
+CLI flags temporarily override profile values.
+
+Use `config --save` when you want the current runtime settings written back into the selected profile.
+
+## Basic Commands
+
+Check the installed version:
+
+```bash
+prism --version
+```
+
+Create the default config profile:
+
+```bash
+prism config --create
+```
+
+Preview organization without moving files:
+
+```bash
+prism organize --dry-run
+```
+
+Organize the current folder:
+
+```bash
+prism organize
+```
+
+Undo the most recent organize run:
+
+```bash
+prism undo
+```
+
+Undo a specific log:
+
+```bash
+prism undo --log-file organize_log_YYYYMMDD_HHMMSS.json
+```
+
+List saved organize logs:
+
+```bash
+prism list-logs
+```
+
+Run with debug output:
+
+```bash
+prism --debug-mode organize
+```
+
+If you are running the development script directly, replace `prism` with:
+
+```bash
+python PRISM-v1.3.0-devt2a.py
+```
+
+## Organize
+
+The organize command sorts top-level files into category folders.
+
+Example:
+
+```bash
+prism organize
+```
+
+Preview first:
+
+```bash
+prism organize --dry-run
+```
+
+Include hidden files:
+
+```bash
+prism organize --sort-hidden
+```
+
+Skip files containing specific text:
+
+```bash
+prism organize --exclude-str "Draft"
+```
+
+Example result:
+
+```text
+report.pdf -> Documents/report.pdf
+photo.jpg -> Images/photo.jpg
+archive.zip -> Archives/archive.zip
+```
+
+If a target filename already exists, PRISM generates a safe duplicate name such as:
+
+```text
+report (1).pdf
+```
+
+## Undo
+
+Undo restores files from a saved JSON run log.
+
+Undo the most recent run:
+
+```bash
+prism undo
+```
+
+Undo a specific run:
+
+```bash
+prism undo --log-file organize_log_YYYYMMDD_HHMMSS.json
+```
+
+Preview an undo:
+
+```bash
+prism undo --dry-run
+```
+
+Undo and delete empty category folders afterward:
+
+```bash
+prism undo --delete-empty-folders
+```
+
+If an undo cannot fully complete, PRISM keeps or updates the remaining log entries instead of pretending everything was restored.
+
+## Logs
+
+PRISM saves organize logs inside:
+
+```text
+.prism_logs/
+```
+
+Logs are JSON files named like:
+
+```text
+organize_log_YYYYMMDD_HHMMSS.json
+```
+
+Each entry stores:
+
+```json
+{
+  "original": "original/path/file.txt",
+  "moved_to": "new/path/file.txt"
+}
+```
+
+These logs make undo possible.
+
+## Config Profiles
+
+Profiles are stored in:
+
+```text
+~/.prism_config/
+```
+
+The default profile is:
+
+```text
+default.json
+```
+
+Select a named profile:
+
+```bash
+prism -c photography organize
+```
+
+This uses:
+
+```text
+~/.prism_config/photography.json
+```
+
+Create a profile:
+
+```bash
+prism -c photography config --create
+```
+
+List profiles:
+
+```bash
+prism config --list
+```
+
+Show the selected profile path:
+
+```bash
+prism -c photography config --path
+```
+
+Show a readable summary:
+
+```bash
+prism -c photography config --status
+```
+
+Show raw JSON:
+
+```bash
+prism -c photography config --show
+```
+
+Reset a profile:
+
+```bash
+prism -c photography config --reset
+```
+
+Delete a profile:
+
+```bash
+prism -c photography config --delete
+```
+
+## Saving Runtime Settings
+
+Save current runtime settings into a profile:
+
+```bash
+prism -c photography config --save --dry-run --exclude-str "Draft"
+```
+
+Another example:
+
+```bash
+prism -c dev config --save --debug-mode
+```
+
+This process works like this:
+
+1. PRISM loads built-in defaults.
+2. PRISM loads the selected profile.
+3. CLI flags override those values.
+4. `config --save` writes the final runtime state into the profile.
+
+Common saved settings include:
 
 - `dry_run`
 - `exclude_str`
 - `sort_hidden`
 - `debug_mode`
+- `delete_empty_folders`
+- `extensions_enabled`
+- `extensions_dir_path`
 
-CLI flags do not permanently modify a profile unless you save them back with `config --save`.
+## Experimental Extensions
+
+`v1.3.0-devt2a` adds the first experimental extension framework.
+
+Extensions are disabled by default.
+
+Enable extensions for one run:
+
+```bash
+prism --extensions-enabled organize --dry-run
+```
+
+Use a custom extension directory:
+
+```bash
+prism --extensions-enabled --extensions-dir ./extensions organize --dry-run
+```
+
+Save extension settings into a profile:
+
+```bash
+prism -c dev config --save --extensions-enabled --extensions-dir ./extensions
+```
+
+Then run with that profile:
+
+```bash
+prism -c dev organize --dry-run
+```
+
+Default extension directory:
+
+```text
+~/.prism_extensions
+```
+
+Current hooks:
+
+- `file_should_process`
+- `file_target_resolve`
+
+Extensions suggest behavior. PRISM core still validates paths, moves files, writes logs, and handles undo.
+
+See the Extension Guide for hook details and examples.
+
+## Debugging
+
+Enable debug output:
+
+```bash
+prism --debug-mode organize
+```
+
+Disable debug output explicitly:
+
+```bash
+prism --no-debug-mode organize
+```
+
+Debug output can show:
+
+- file classification
+- skip decisions
+- target path resolution
+- selected undo log
+- missing moved files
+- restore target paths
+- extension loading order
+- extension skip or target suggestions
 
 ## Example Workflows
 
-### Default everyday use
+### Everyday Cleanup
 
-`python prism-core.py config --create`  
-`python prism-core.py organize`
+```bash
+prism config --create
+prism organize --dry-run
+prism organize
+```
 
-### Photo-specific profile
+### Photo Folder Profile
 
-`python prism-core.py -c photography config --create`  
-`python prism-core.py -c photography config --save --dry-run --exclude-str "Draft"`  
-`python prism-core.py -c photography organize`
+```bash
+prism -c photography config --create
+prism -c photography config --save --dry-run --exclude-str "Draft"
+prism -c photography organize
+```
 
-### Debug a run
+### Extension Test Run
 
-`python prism-core.py --debug-mode organize`  
-`python prism-core.py --debug-mode undo`
+```bash
+prism --debug-mode --extensions-enabled --extensions-dir ./extensions organize --dry-run
+```
 
-### Inspect a profile before use
+### Safe Undo
 
-`python prism-core.py -c photography config --status`  
-`python prism-core.py -c photography config --show`
+```bash
+prism list-logs
+prism undo --dry-run
+prism undo --delete-empty-folders
+```
 
 ## Notes
 
 - Use `--dry-run` before large organize runs.
-- Use `--debug-mode` when you want internal tracing for classification, target-path resolution, and undo behavior.
-- Use `list-logs` to inspect previous runs.
-- Use `undo` to revert an earlier organize run.
-- Use named profiles to separate different workflows safely.
+- Use `undo` soon after organizing if you want an easy rollback.
+- Use named profiles to separate workflows.
+- Use debug mode when behavior looks unexpected.
+- Treat the extension API as experimental until the stable v1.3.x release.
