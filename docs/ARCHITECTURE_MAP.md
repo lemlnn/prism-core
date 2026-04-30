@@ -2,71 +2,83 @@
 
 ## Overview
 
-PRISM is currently a layered Python CLI tool with four main concerns:
+PRISM is a layered Python CLI tool with these main concerns:
 
 - command parsing
 - runtime/config state
 - app-level command routing
-- filesystem and organize/undo behavior
+- filesystem behavior
+- extension loading and hook dispatch
+- organize/undo coordination
+- logging
 
-As of v1.2.4p, the codebase is in a pre-extension architecture stage.
+As of `v1.3.0-devt2a`, PRISM has entered the first experimental extension-system stage.
 
-## Current Runtime Objects
+## Runtime Objects
 
 ### `DefaultConfig`
 
-`DefaultConfig` defines the built-in baseline state for the application, including:
+`DefaultConfig` defines the built-in baseline state.
+
+It includes:
 
 - script metadata
+- version
 - log directory name
 - working folder
 - config directory
-- behavior defaults such as `dry_run`, `sort_hidden`, and `exclude_str`
+- extension settings
+- behavior defaults
 - default file-type routing
 
 This is the immutable baseline.
 
 ### `RuntimeConfig`
 
-`RuntimeConfig` is the active runtime state used by the rest of the system.
+`RuntimeConfig` is the active state used during a run.
 
 It is built from:
 
 1. built-in defaults
-2. loaded config profile values
+2. selected config profile
 3. CLI overrides
 
-This object is the main configuration payload that moves through the rest of PRISM.
+Most major services receive `RuntimeConfig` instead of reading global settings directly.
 
 ## Main Layers
 
-### 1. CLI / Entry Layer
+## 1. CLI / Entry Layer
 
-The CLI layer is responsible for:
+Responsible for:
 
-- defining top-level commands
+- defining commands
 - defining global options
-- defining shared command flags
+- defining shared flags
 - parsing user input
+- routing into the main command flow
 
 Main entry points:
+
 - `parse_args()`
 - `main()`
 
-This layer should answer:
-“What did the user ask PRISM to do?”
+This layer answers:
 
-### 2. Config / Runtime Layer
+> What did the user ask PRISM to do?
 
-The config layer is responsible for:
+## 2. Config / Runtime Layer
 
-- loading saved profile data
-- serializing config values
+Responsible for:
+
+- loading profile JSON
 - building runtime config
-- saving and resetting profiles
+- serializing config
+- saving profiles
+- resetting profiles
 - showing config status
 
 Main functions:
+
 - `load_config()`
 - `build_runtime_config()`
 - `write_config()`
@@ -74,145 +86,258 @@ Main functions:
 - `serialize_config()`
 - `show_config_status()`
 
-This layer should answer:
-“What runtime state should PRISM operate with?”
+This layer answers:
 
-### 3. App Layer
+> What runtime state should PRISM use?
+
+## 3. App Layer
 
 The app layer currently exists as `PrismApp`.
 
-Its main responsibility is config command handling.
+Responsible for:
+
+- high-level config command handling
+- config action routing
+- keeping config command logic out of `main()`
 
 Main class:
+
 - `PrismApp`
 
 Main method:
+
 - `handle_config_command()`
 
-This layer should answer:
-“How should high-level application commands be handled?”
+This layer answers:
 
-### 4. Filesystem / Behavior Layer
+> How should high-level application commands be handled?
 
-The filesystem layer currently exists as `FileSystemService`.
+## 4. Extension Layer
 
-It is responsible for:
+The extension layer is experimental.
 
-- iterating directory entries
+Responsible for:
+
+- loading local `.py` extension files
+- skipping files that start with `_`
+- ordering extensions by priority
+- calling supported hooks safely
+- validating extension suggestions before core uses them
+
+Main classes:
+
+- `ExtensionLoader`
+- `ExtensionManager`
+
+Current hooks:
+
+- `file_should_process`
+- `file_target_resolve`
+
+Main models:
+
+- `FileShouldProcessContext`
+- `ProcessSuggestion`
+- `FileTargetContext`
+- `TargetSuggestion`
+
+This layer answers:
+
+> What optional behavior have extensions suggested, and is it safe enough for core to use?
+
+## 5. Filesystem / Behavior Layer
+
+Responsible for:
+
+- reading directory entries
+- collecting top-level files
 - classifying files
 - deciding skip behavior
 - resolving target paths
-- handling duplicate-safe naming
+- generating duplicate-safe names
 - moving files
+- deleting empty folders after undo
 
-Main class:
+Main classes:
+
+- `FileEntryService`
+- `FileClassificationService`
+- `FileProcessResolver`
+- `FilePathService`
+- `FileTargetResolver`
 - `FileSystemService`
 
-This layer should answer:
-“How should file-level behavior work?”
+This layer answers:
 
-### 5. Top-Level Operation Layer
+> How should file-level behavior work?
 
-These functions coordinate organize and undo flows using `RuntimeConfig` and `FileSystemService`.
+## 6. Top-Level Operation Layer
+
+Responsible for coordinating user-visible flows.
 
 Main functions:
+
 - `organize_files()`
 - `undo_recent_organize()`
 
-This layer should answer:
-“How do the main user-visible flows execute from start to finish?”
+This layer does not own every low-level detail. It coordinates config, filesystem behavior, extension suggestions, logging, and output.
 
-### 6. Logging Layer
+This layer answers:
 
-The logging layer is responsible for:
+> How do organize and undo execute from start to finish?
 
+## 7. Logging Layer
+
+Responsible for:
+
+- creating log directories
 - creating log paths
 - saving run logs
 - loading run logs
 - finding the latest log
-- listing available logs
+- listing logs
 
 Main functions:
+
+- `check_log_dir()`
 - `create_log_path()`
 - `save_log()`
 - `load_log()`
 - `get_latest_log()`
 - `list_logs()`
 
-This layer should answer:
-“How does PRISM persist and inspect organize history?”
+This layer answers:
 
-## Flow of Control
+> How does PRISM persist and inspect organize history?
 
-### Organize Flow
+## Organize Flow
 
-1. `main()` parses args
-2. PRISM resolves the active config profile
-3. `build_runtime_config()` creates `RuntimeConfig`
-4. `organize_files()` starts the organize flow
-5. `FileSystemService` collects files and classifies behavior
-6. files are skipped, previewed, or moved
-7. if not in dry-run mode, a JSON run log is saved
-8. summary output is printed
+1. `main()` parses args.
+2. PRISM resolves the config profile path.
+3. `load_config()` loads saved profile data.
+4. `build_runtime_config()` creates active runtime state.
+5. `organize_files()` starts the organize flow.
+6. `FileSystemService` collects top-level files.
+7. Core skip rules run.
+8. Extension skip suggestions may run.
+9. Core classification determines the original category.
+10. Extension target suggestions may override the category after validation.
+11. PRISM previews or moves files.
+12. If files were moved, a JSON run log is saved.
+13. Summary output is printed.
 
-### Undo Flow
+## Undo Flow
 
-1. `main()` parses args
-2. PRISM resolves the active config profile
-3. `build_runtime_config()` creates `RuntimeConfig`
-4. `undo_recent_organize()` selects a log
-5. move entries are processed in reverse
-6. files are restored, skipped, or left unresolved
-7. the log is updated or removed
-8. summary output is printed
+1. `main()` parses args.
+2. PRISM resolves runtime config.
+3. `undo_recent_organize()` selects a log.
+4. Log entries are processed in reverse order.
+5. Core skip rules run.
+6. PRISM resolves safe restore targets.
+7. Files are previewed or restored.
+8. The log is updated or removed.
+9. Empty folders may be deleted if enabled.
+10. Summary output is printed.
 
-### Config Flow
+## Config Flow
 
-1. `main()` parses args
-2. config profile path is resolved
-3. `build_runtime_config()` creates active runtime state
-4. `PrismApp.handle_config_command()` routes the requested config action
-5. config is created, saved, listed, shown, reset, or deleted
+1. `main()` parses args.
+2. PRISM resolves the selected profile path.
+3. `load_config()` loads profile data if it exists.
+4. `build_runtime_config()` applies CLI overrides.
+5. `PrismApp.handle_config_command()` routes the config action.
+6. The profile is created, saved, listed, shown, reset, or deleted.
 
-## Current Architectural Boundaries
+## Extension Flow
 
-PRISM currently has these meaningful boundaries:
+1. Runtime config decides whether extensions are enabled.
+2. `ExtensionLoader` resolves the extension directory.
+3. The directory is created if needed.
+4. `.py` files are loaded unless their names start with `_`.
+5. Loaded extensions are sorted by priority.
+6. `ExtensionManager` calls supported hooks.
+7. Hook results are parsed and validated.
+8. Valid suggestions may influence skip or target behavior.
+9. Invalid suggestions are ignored with warnings.
 
-- CLI parsing should not own file behavior
-- config loading should not own organize/undo flow
-- app-level command handling should not directly implement filesystem behavior
-- filesystem behavior should not own CLI parsing
-- organize/undo flows should coordinate, not absorb every low-level helper
+## Current Boundaries
 
-These boundaries are the main reason v1.2.4p matters.
+PRISM currently follows these boundaries:
+
+- CLI parsing should not own file behavior.
+- Config loading should not own organize/undo flow.
+- App command handling should not directly implement filesystem behavior.
+- Filesystem behavior should not own CLI parsing.
+- Extensions should suggest behavior, not directly control core safety.
+- Organize/undo should coordinate instead of absorbing every helper.
+- Core should own path validation, moves, logs, and undo.
+
+## Extension Safety Boundary
+
+Extensions may suggest:
+
+- whether a file should be processed
+- what category a file should route to
+
+Extensions should not own:
+
+- actual file movement
+- absolute target paths
+- path traversal
+- undo log integrity
+- duplicate-safe naming
+- core validation
+
+Extension target categories must be safe relative paths.
+
+Allowed:
+
+```text
+Documents/Markdown
+Images/Sony
+School/AP_Bio
+```
+
+Blocked:
+
+```text
+../OutsideFolder
+/home/user/Desktop
+C:/Users/name/Desktop
+.
+empty string
+```
 
 ## Current Focus Areas
 
-The next major architecture milestone is the extension system.
+The current milestone is stabilizing the experimental extension system.
 
-That future work will likely need to touch:
+Current extension surface:
 
-- registration model
-- extension lifecycle
-- public vs private core surfaces
-- config interaction
-- possible extension-defined settings
-- future TUI/GUI configuration needs
+- local extension discovery
+- extension priority ordering
+- hook dispatch
+- process/skip suggestions
+- target-folder suggestions
+- safe category validation
 
-That means the most sensitive current areas are:
+Sensitive areas:
 
-- app/control routing
-- runtime config representation
-- filesystem behavior boundaries
-- how much of classification / skip / move behavior should stay core-owned
+- keeping core-owned safety boundaries clear
+- deciding which hooks become stable public API
+- preventing extensions from bypassing path safety
+- deciding how extension settings should be represented
+- keeping logs reliable when extensions influence routing
+- preparing the extension model for future TUI/GUI use
 
-## Future Extension Boundary Questions
+## Remaining Extension Questions
 
-These are the major future questions PRISM is currently approaching:
+Before the extension API becomes stable, this update still needs to resolve these questions:
 
-- how extensions should register themselves
-- whether they should be command-based, hook-based, event-based, or mixed
-- how much access they should have to core internals
-- how extension-defined settings should be represented and validated
-- how a future TUI/GUI could reflect plugin-defined configuration requirements
-- what the first minimal extension surface should be
+- how many hooks belong in the first stable API
+- whether extensions should only suggest behavior or also add commands
+- how extension-defined settings should be stored
+- whether extension metadata should use a manifest file
+- how extension conflicts should be reported
+- how a TUI/GUI should display extension options
+- how much of the context model should become public API
