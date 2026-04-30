@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prism-core"
-version = "1.2.5"
-description = "A safety-focused Python CLI file organizer with dry-run, undo, logs, and config profiles."
+version = "1.3.0.dev2"
+description = "A safe folder cleanup tool with preview, undo, logs, config profiles, and experimental extensions."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
