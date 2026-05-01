@@ -99,7 +99,7 @@ Extensions can suggest behavior, but PRISM core still owns path safety, file mov
 
 ## Tested Platforms
 
-- Windows 10/11
+- Windows 10/11 (restricted, unrestricted)
 - Fedora KDE 42/43
 
 ## Credits
@@ -113,7 +113,7 @@ Development Team:
 Alpha Testers:
 
 - Bella - beta macOS compatibility attempt
-- Gavin ([@dojozycknar10-player](https://github.com/dojozycknar10-player)) - Windows 11 compatibility
+- Gavin ([@dojozycknar10-player](https://github.com/dojozycknar10-player)) - Windows 11 restricted environment compatibility
 - Maxwell ([@b135-crypto](https://github.com/b135-crypto)) - planned Zorin OS and macOS compatibility
 
 Early Contributors:
