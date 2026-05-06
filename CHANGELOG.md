@@ -1,5 +1,29 @@
 # Changelog
 
+## PRISM [v1.3.0-devt3a] (5/6/26)
+
+Extension usability and CLI output polish release.
+
+Added:
+
+- `extension` command for extension management and inspection
+- `extension --status` to show extension runtime status
+- `extension --create` to create the configured extensions directory
+- loaded extension count in extension status output
+- loaded extension detail output with name, priority, and supported hooks
+
+Changed:
+
+- normal organize and undo output now uses cleaner relative paths
+- debug output still keeps full technical paths
+- extension examples now use `--enable-extensions`
+- extension docs now include extension directory creation and status commands
+
+Notes:
+
+- development build
+- extension API is still experimental
+
 ## PRISM [v1.3.0-devt2a] (4/30/26)
 
 First experimental extension-system development build.

@@ -81,13 +81,31 @@ Extensions are disabled by default.
 Enable extensions for one run:
 
 ```bash
-prism --extensions-enabled organize --dry-run
+prism --enable-extensions organize --dry-run
+```
+
+Create the default extensions directory:
+
+```bash
+prism extension --create
+```
+
+Show extension status:
+
+```bash
+prism extension --status
 ```
 
 Use a custom extension folder:
 
 ```bash
-prism --extensions-enabled --extensions-dir ./extensions organize --dry-run
+prism --enable-extensions --extensions-dir ./extensions organize --dry-run
+```
+
+Inspect loaded extensions from a custom folder:
+
+```bash
+prism --enable-extensions --extensions-dir ./extensions extension --status
 ```
 
 Current hooks:
@@ -95,7 +113,7 @@ Current hooks:
 - `file_should_process`
 - `file_target_resolve`
 
-Extensions can suggest behavior, but PRISM core still owns path safety, file movement, logs, and undo.
+Extensions can suggest behavior, but the core system still operates main functionality
 
 ## Tested Platforms
 

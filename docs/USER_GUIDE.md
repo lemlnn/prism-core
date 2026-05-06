@@ -81,7 +81,7 @@ prism --debug-mode organize
 If you are running the development script directly, replace `prism` with:
 
 ```bash
-python PRISM-v1.3.0-devt2a.py
+python PRISM-v1.3.0-devt3a.py
 ```
 
 ## Organize
@@ -277,37 +277,19 @@ Common saved settings include:
 - `sort_hidden`
 - `debug_mode`
 - `delete_empty_folders`
-- `extensions_enabled`
+- `enable_extensions`
 - `extensions_dir_path`
 
 ## Experimental Extensions
 
-`v1.3.0-devt2a` adds the first experimental extension framework.
+`v1.3.0-devt3a` continues the experimental extension framework.
 
 Extensions are disabled by default.
 
-Enable extensions for one run:
+Create the default extension directory:
 
 ```bash
-prism --extensions-enabled organize --dry-run
-```
-
-Use a custom extension directory:
-
-```bash
-prism --extensions-enabled --extensions-dir ./extensions organize --dry-run
-```
-
-Save extension settings into a profile:
-
-```bash
-prism -c dev config --save --extensions-enabled --extensions-dir ./extensions
-```
-
-Then run with that profile:
-
-```bash
-prism -c dev organize --dry-run
+prism extension --create
 ```
 
 Default extension directory:
@@ -316,12 +298,52 @@ Default extension directory:
 ~/.prism_extensions
 ```
 
+Show extension status:
+
+```bash
+prism extension --status
+```
+
+Enable extensions for one run:
+
+```bash
+prism --enable-extensions organize --dry-run
+```
+
+Use a custom extension directory:
+
+```bash
+prism --enable-extensions --extensions-dir ./extensions organize --dry-run
+```
+
+Create a custom extension directory:
+
+```bash
+prism --extensions-dir ./extensions extension --create
+```
+
+Inspect loaded extensions from a custom directory:
+
+```bash
+prism --enable-extensions --extensions-dir ./extensions extension --status
+```
+
+Save extension settings into a profile:
+
+```bash
+prism -c dev config --save --enable-extensions --extensions-dir ./extensions
+```
+
+Then run with that profile:
+
+```bash
+prism -c dev organize --dry-run
+```
+
 Current hooks:
 
 - `file_should_process`
 - `file_target_resolve`
-
-Extensions suggest behavior. PRISM core still validates paths, moves files, writes logs, and handles undo.
 
 See the Extension Guide for hook details and examples.
 

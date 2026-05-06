@@ -2,7 +2,7 @@
 
 ## Status
 
-The PRISM extension system is experimental as of `v1.3.0-devt2a`.
+The PRISM extension system is experimental as of `v1.3.0-devt3a`.
 
 Extensions are disabled by default. The API may change or be added to before the stable v1.3.x release.
 
@@ -21,22 +21,30 @@ This allows extensions to influence sorting without bypassing PRISM’s safety m
 
 ## Enable Extensions
 
+Extensions are disabled by default.
+
 Enable extensions for one run:
 
 ```bash
-prism --extensions-enabled organize --dry-run
+prism --enable-extensions organize --dry-run
+```
+
+Create the default extensions directory:
+
+```bash
+prism extension --create
 ```
 
 Use a custom extension directory:
 
 ```bash
-prism --extensions-enabled --extensions-dir ./extensions organize --dry-run
+prism --enable-extensions --extensions-dir ./extensions organize --dry-run
 ```
 
 Save extension settings into a profile:
 
 ```bash
-prism -c dev config --save --extensions-enabled --extensions-dir ./extensions
+prism -c dev config --save --enable-extensions --extensions-dir ./extensions
 ```
 
 Run later with that profile:
@@ -92,7 +100,7 @@ Suggested priority ranges:
 
 ## Current Hooks
 
-`v1.3.0-devt2a` supports two hooks:
+`v1.3.0-devt3a` supports two hooks:
 
 - `file_should_process`
 - `file_target_resolve`
@@ -247,7 +255,7 @@ EXTENSION_PRIORITY = 50
 Use debug mode:
 
 ```bash
-prism --debug-mode --extensions-enabled organize --dry-run
+prism --debug-mode --enable-extensions organize --dry-run
 ```
 
 Debug output can show:

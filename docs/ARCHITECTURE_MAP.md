@@ -12,7 +12,7 @@ PRISM is a layered Python CLI tool with these main concerns:
 - organize/undo coordination
 - logging
 
-As of `v1.3.0-devt2a`, PRISM has entered the first experimental extension-system stage.
+As of `v1.3.0-devt3a`, PRISM has entered the first experimental extension-system stage.
 
 ## Runtime Objects
 
@@ -250,15 +250,14 @@ This layer answers:
 
 ## Extension Flow
 
-1. Runtime config decides whether extensions are enabled.
-2. `ExtensionLoader` resolves the extension directory.
-3. The directory is created if needed.
-4. `.py` files are loaded unless their names start with `_`.
-5. Loaded extensions are sorted by priority.
-6. `ExtensionManager` calls supported hooks.
-7. Hook results are parsed and validated.
-8. Valid suggestions may influence skip or target behavior.
-9. Invalid suggestions are ignored with warnings.
+1. `main()` parses args.
+2. PRISM resolves the selected config profile.
+3. `load_config()` loads profile data if it exists.
+4. `build_runtime_config()` applies CLI overrides.
+5. `PrismApp.handle_extension_command()` routes the extension action.
+6. `extension --create` creates the configured extension directory.
+7. `extension --status` shows extension settings and loaded extension details.
+8. If extensions are enabled, `ExtensionManager` loads extension modules for inspection.
 
 ## Current Boundaries
 
