@@ -50,11 +50,11 @@ class DefaultConfig: #hardcoded default settings
 
     debug_mode: bool = False
     script_name: str = "prism"
-    script_version: str = "1.3.0p-devt2a"
+    script_version: str = "1.3.0p-devt3a"
     log_dir_name: str = ".prism_logs"
     folder_path: Path = field(default_factory=Path.cwd)
     config_dir_path: Path = Path.home() / ".prism_config"
-    extensions_enabled: bool = False
+    enable_extensions: bool = False
     extensions_dir_path: Path = Path.home() / ".prism_extensions"
     dry_run: bool = False
     sort_hidden: bool = False
@@ -73,7 +73,7 @@ class RuntimeConfig: #user requested settings
     log_dir_name: str
     folder_path: Path
     config_dir_path: Path
-    extensions_enabled: bool
+    enable_extensions: bool
     extensions_dir_path: Path
     dry_run: bool
     sort_hidden: bool
@@ -147,7 +147,7 @@ class ExtensionLoader: #loads extensions from the specified folder
         self.config = config
 
     def load(self) -> list:
-        if not self.config.extensions_enabled:
+        if not self.config.enable_extensions:
             return []
 
         extension_dir = self.config.extensions_dir_path
@@ -226,6 +226,7 @@ class ExtensionManager: #calls hooks from the modules
             ext_name = self.get_extension_name(module)
             print(f"[warn] Extension hook failed in {ext_name}.{hook_name}: {error}")
             return None
+
 
 #endregion
 
@@ -360,6 +361,58 @@ class PrismApp: #organized class of non file action functions
             print(f"  {self.config.script_name} config --delete")
             print(f"  {self.config.script_name} config --help")
             pause_before_exit()
+
+    def handle_extension_command(self, args: argparse.Namespace) -> None:
+        if args.create:
+            if self.config.extensions_dir_path.exists():
+                print(f"[info] Extensions directory already exists: {self.config.extensions_dir_path}")
+            else:
+                try:
+                    self.config.extensions_dir_path.mkdir(parents=True, exist_ok=True)
+                    print(f"[success] Created extensions directory: {self.config.extensions_dir_path}")
+                except OSError as error:
+                    print(f"[error] Could not create extensions directory {self.config.extensions_dir_path}: {error}")
+        elif args.status:
+            manager = ExtensionManager(self.config)
+
+            print("PRISM Extension Status")
+            print("----------------------")
+            print(f"Extensions enabled : {self.config.enable_extensions}")
+            print(f"Extensions folder  : {self.config.extensions_dir_path}")
+            print(f"Loaded extensions  : {len(manager.extensions)}")
+
+            if not self.config.enable_extensions:
+                print("\n[info] Extensions are disabled.")
+                print("[info] Use --enable-extensions to enable them for one run.")
+                return
+            if not manager.extensions:
+                print("\n[info] No extensions loaded.")
+                return
+
+            print("\nLoaded extension details:")
+
+            for module in manager.extensions:
+                ext_name = ExtensionManager.get_extension_name(module)
+                ext_priority = int(getattr(module, "EXTENSION_PRIORITY", 0))
+                hooks = []
+
+                if hasattr(module, FILE_SHOULD_PROCESS_HOOK):
+                    hooks.append(FILE_SHOULD_PROCESS_HOOK)
+                if hasattr(module, FILE_TARGET_RESOLVE_HOOK):
+                    hooks.append(FILE_TARGET_RESOLVE_HOOK)
+
+                hook_text = ", ".join(hooks) if hooks else "none"
+
+                print(f"- {ext_name}")
+                print(f"  Priority: {ext_priority}")
+                print(f"  Hooks   : {hook_text}")
+        else:
+            print("No extension action provided.\n")
+            print("Examples:")
+            print(f"  {self.config.script_name} extension --create")
+            print(f"  {self.config.script_name} extension --status")
+            print(f"  {self.config.script_name} --enable-extensions extension --status")
+            print(f"  {self.config.script_name} --enable-extensions --extensions-dir ./extensions extension --status")
 
 #endregion
 
@@ -526,6 +579,15 @@ class FilePathService: #responsible for file path helpers and move functions
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(source), str(destination))
 
+    def abs_to_relative_path(self, path: Path, root: Path) -> str: #function to change absolute paths to relative paths for runs without debug mode
+        debug_mode = self.config.debug_mode
+        if debug_mode:
+            return str(path)
+        try:
+            return str(path.relative_to(root))
+        except ValueError:
+            return str(path)
+
     def delete_empty_folders(self, folder: Path) -> int: #function to delete empty folders safely if the flag is turned on
         deleted_count = 0
         protected_names = {self.config.log_dir_name}
@@ -629,6 +691,9 @@ class FileSystemService:  #responsible for functions used by the organize/undo c
 
     def build_target_path(self, path: Path, folder: Path) -> Path:
         return self.targets.build_target_path(path, folder)
+    
+    def abs_to_relative_path(self, path: Path, root: Path) -> str:
+        return self.paths.abs_to_relative_path(path, root)
 
     def delete_empty_folders(self, folder: Path) -> int:
         return self.paths.delete_empty_folders(folder)
@@ -677,19 +742,20 @@ def organize_files(folder: Path, runtime_config: RuntimeConfig) -> None: #core o
                 print(f"[debug] Skip: {path.name} ({extension_skip_reason})")
             continue
 
-        target_path = fs.build_target_path(path, folder)    
+        target_path = fs.build_target_path(path, folder)
+        display_path = fs.abs_to_relative_path(target_path, folder)
 
         if runtime_config.debug_mode:
             core_category = fs.classify_file(path)
             print(f"[debug] Core classified: {path.name} -> {core_category}")
             print(f"[debug] Final target path: {target_path}")
         if runtime_config.dry_run:
-            print(f"[dry-run] Move: {path.name} -> {target_path}")
+            print(f"[dry-run] Move: {path.name} -> {display_path}")
             files_moved += 1
             continue
         try:
             fs.move_file(path, target_path)
-            print(f"[success] Moved: {path.name} -> {target_path}")
+            print(f"[success] Moved: {path.name} -> {display_path}")
             files_moved += 1
             move_log.append({
                 "original": str(path),
@@ -765,15 +831,17 @@ def undo_recent_organize(folder: Path, runtime_config: RuntimeConfig, log_file: 
             continue
 
         restore_target = fs.get_unique_path(original)
+        display_path_moved = fs.abs_to_relative_path(moved_to, folder)
+        display_path_restore = fs.abs_to_relative_path(restore_target, folder)
 
         if runtime_config.debug_mode:
             print(f"[debug] Restore target resolved: {original} -> {restore_target}")
         try:
             if runtime_config.dry_run:
-                print(f"[dry-run] Undo: {moved_to} -> {restore_target}")
+                print(f"[dry-run] Undo: {display_path_moved} -> {display_path_restore}")
             else:
                 fs.move_file(moved_to, restore_target)
-                print(f"[success] Undo: {moved_to.name} -> {restore_target}")
+                print(f"[success] Undo: {display_path_moved} -> {display_path_restore}")
 
             entries_undone += 1
 
@@ -963,7 +1031,7 @@ def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConf
     sort_hidden_arg = getattr(args, "sort_hidden", None)
     exclude_str_arg = getattr(args, "exclude_str", None)
     delete_empty_folders_arg = getattr(args, "delete_empty_folders", None)
-    extensions_enabled_arg = getattr(args, "extensions_enabled", None)
+    enable_extensions_arg = getattr(args, "enable_extensions", None)
     extensions_dir_path_arg = getattr(args, "extensions_dir_path", None)
 
     return RuntimeConfig(
@@ -977,10 +1045,10 @@ def build_runtime_config(args, loaded_config: dict | None = None) -> RuntimeConf
         log_dir_name=loaded_config.get("log_dir_name", default_config.log_dir_name),
         folder_path=Path(loaded_config.get("folder_path", default_config.folder_path)),
         config_dir_path=Path(loaded_config.get("config_dir_path", default_config.config_dir_path)),
-        extensions_enabled=(
-            extensions_enabled_arg
-            if extensions_enabled_arg is not None
-            else loaded_config.get("extensions_enabled", default_config.extensions_enabled)
+        enable_extensions=(
+            enable_extensions_arg
+            if enable_extensions_arg is not None
+            else loaded_config.get("enable_extensions", default_config.enable_extensions)
         ),
         extensions_dir_path=Path(
             extensions_dir_path_arg
@@ -1030,7 +1098,7 @@ def build_config_status(runtime_config: RuntimeConfig, config_path: Path) -> lis
     lines.append(f"  Script version      : {runtime_config.script_version}")
     lines.append(f"  Working folder      : {runtime_config.folder_path}")
     lines.append(f"  Log directory       : {runtime_config.log_dir_name}")
-    lines.append(f"  Extensions enabled  : {runtime_config.extensions_enabled}")
+    lines.append(f"  Extensions enabled  : {runtime_config.enable_extensions}")
     lines.append(f"  Extensions folder   : {runtime_config.extensions_dir_path}")
     lines.append(f"  Dry run             : {runtime_config.dry_run}")
     lines.append(f"  Sort hidden         : {runtime_config.sort_hidden}")
@@ -1061,8 +1129,8 @@ def parse_args() -> argparse.Namespace: #function to load all arguments for the 
 
         Examples:
           %(prog)s organize --dry-run
-          %(prog)s --extensions-enabled organize --dry-run
-          %(prog)s --extensions-enabled --extensions-dir ./extensions organize --dry-run
+          %(prog)s --enable_extensions organize --dry-run
+          %(prog)s --enable_extensions --extensions-dir ./extensions organize --dry-run
           %(prog)s -c my_profile config --save --dry-run --exclude-str "Draft"
           %(prog)s -c photography organize
           %(prog)s config --list
@@ -1091,7 +1159,7 @@ def parse_args() -> argparse.Namespace: #function to load all arguments for the 
         help="Enable or disable additional debug dialogues for actions"
     )
     global_group.add_argument(
-        "--extensions-enabled",
+        "--enable-extensions",
         action=argparse.BooleanOptionalAction,
         default=None,
         help="Enable or disable extension framework"
@@ -1151,6 +1219,15 @@ def parse_args() -> argparse.Namespace: #function to load all arguments for the 
         default=None,
         help="Delete empty category folders after undo completes"
     )
+
+    extension_parser = subparsers.add_parser(
+        "extension",
+        help="Manage and view extensions"
+    )
+    
+    extension_actions = extension_parser.add_mutually_exclusive_group()
+    extension_actions.add_argument("--status", action="store_true", help="Show current extension summary")
+    extension_actions.add_argument("--create", action="store_true", help="Create the extensions directory")
 
     subparsers.add_parser(
         "list-logs",
@@ -1218,6 +1295,8 @@ def main() -> None: #function as the main runtime pathway and calling processes/
     elif args.command == "organize":
         print(f"Working in {runtime_config.folder_path}")
         organize_files(runtime_config.folder_path, runtime_config)
+    elif args.command == "extension":
+        app.handle_extension_command(args)
     elif args.command == "config":
         app.handle_config_command(args)
     else:
