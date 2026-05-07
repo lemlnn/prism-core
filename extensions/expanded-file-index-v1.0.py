@@ -1,6 +1,6 @@
 #made by lemlnn
 
-EXTENSION_NAME = "expanded_file_types"
+EXTENSION_NAME = "expanded-file-index"
 EXTENSION_PRIORITY = 10
 
 EXTENSION_CATEGORIES = {
