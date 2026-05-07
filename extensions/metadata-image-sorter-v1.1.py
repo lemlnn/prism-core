@@ -1,5 +1,5 @@
 #made by lemlnn
-EXTENSION_NAME = "metadata-image-sorter-v1.1"
+EXTENSION_NAME = "metadata-image-sorter"
 EXTENSION_PRIORITY = 80
 
 import json
