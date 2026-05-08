@@ -10,7 +10,7 @@ A safe folder cleanup tool that sorts files, previews changes, and lets you undo
 
 PRISM helps clean messy folders by sorting files into categories like Images, Documents, Videos, and Archives. It can preview changes before moving anything, save logs of what happened, undo previous organize runs, and support experimental extensions for custom sorting behavior.
 
-> `v1.3.0-devt2a` is a development build. The extension system is experimental and may change before the stable v1.3.x release.
+> `v1.3.0-devt3a` is a development build. The extension system is experimental and may change before the stable v1.3.x release.
 
 ## Features
 
