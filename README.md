@@ -123,6 +123,7 @@ Extensions can suggest behavior, but the core system still operates main functio
 - Windows 10/11 (restricted, unrestricted)
 - Fedora KDE 42/43
 - EndeavourOS
+- MacOS (beta)
 
 ## Credits
 Special thanks to my early contributors and testers
