@@ -31,6 +31,8 @@ cd prism-core
 python -m pip install .
 ```
 
+If `python` does not work, try `python3` (MacOS)  
+  
 After installation:
 
 ```bash
@@ -134,7 +136,7 @@ Alpha Testers:
 
 - Bella - beta macOS compatibility attempt
 - Gavin ([@dojozycknar10-player](https://github.com/dojozycknar10-player)) - Windows 11 restricted environment compatibility
-- Maxwell ([@b135-crypto](https://github.com/b135-crypto)) - planned Zorin OS and macOS compatibility
+- Chenqi ([@anthonylolsun](https://github.com/anthonylolsun)) - macOS compatibility
 
 Early Contributors:
 
