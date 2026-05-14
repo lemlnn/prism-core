@@ -1,6 +1,5 @@
 #made by lemlnn
-
-EXTENSION_NAME = "expanded-file-index"
+EXTENSION_NAME = "expanded_file_types-v1.1"
 EXTENSION_PRIORITY = 10
 
 EXTENSION_CATEGORIES = {
@@ -148,6 +147,8 @@ EXTENSION_CATEGORIES = {
 
     # Applications
     ".apk": "Applications",
+    ".appimage": "Applications",
+    ".exe": "Applications",
 
     # Fonts
     ".fnt": "Fonts",
@@ -162,9 +163,13 @@ EXTENSION_CATEGORIES = {
     ".afs": "Fonts",
 }
 
+EXTENSION_CATEGORIES = {
+    ext.lower(): category
+    for ext, category in EXTENSION_CATEGORIES.items()
+}
 
 def file_target_resolve(context):
-    category = EXTENSION_CATEGORIES.get(context.extension)
+    category = EXTENSION_CATEGORIES.get(context.extension.lower())
 
     if category is None:
         return None
