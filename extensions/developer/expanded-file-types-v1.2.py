@@ -1,5 +1,5 @@
 #made by lemlnn
-EXTENSION_NAME = "expanded_file_types-v1.1"
+EXTENSION_NAME = "expanded_file_types-v1.2"
 EXTENSION_PRIORITY = 10
 
 EXTENSION_CATEGORIES = {
@@ -168,11 +168,49 @@ EXTENSION_CATEGORIES = {
     for ext, category in EXTENSION_CATEGORIES.items()
 }
 
+CATEGORY_ALIASES = {}
+CATEGORY_PREFIX = ""
+
+
+def configure_extension(options):
+    global CATEGORY_ALIASES
+    global CATEGORY_PREFIX
+
+    options = options or {}
+
+    CATEGORY_PREFIX = str(options.get("category_prefix", "")).strip().strip("/")
+
+    CATEGORY_ALIASES = {
+        "Images": str(options.get("images_folder", "Images")),
+        "Design": str(options.get("design_folder", "Design")),
+        "Documents": str(options.get("documents_folder", "Documents")),
+        "Spreadsheets": str(options.get("spreadsheets_folder", "Spreadsheets")),
+        "Presentations": str(options.get("presentations_folder", "Presentations")),
+        "Office": str(options.get("office_folder", "Office")),
+        "Videos": str(options.get("videos_folder", "Videos")),
+        "Audio": str(options.get("audio_folder", "Audio")),
+        "Code": str(options.get("code_folder", "Code")),
+        "Applications": str(options.get("applications_folder", "Applications")),
+        "Fonts": str(options.get("fonts_folder", "Fonts")),
+    }
+
+
+def resolve_category_alias(category):
+    category = CATEGORY_ALIASES.get(category, category)
+
+    if CATEGORY_PREFIX:
+        return f"{CATEGORY_PREFIX}/{category}"
+
+    return category
+
+
 def file_target_resolve(context):
     category = EXTENSION_CATEGORIES.get(context.extension.lower())
 
     if category is None:
         return None
+
+    category = resolve_category_alias(category)
 
     return {
         "category": category,

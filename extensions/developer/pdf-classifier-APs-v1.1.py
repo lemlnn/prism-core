@@ -2,7 +2,7 @@
 
 #region extension-metadata
 
-EXTENSION_NAME = "pdf-classifier-APs-v1.0"
+EXTENSION_NAME = "pdf-classifier-APs-v1.1"
 EXTENSION_PRIORITY = 70
 
 #endregion
@@ -26,6 +26,44 @@ ROUTE_LOW_CONFIDENCE = True
 ENABLE_PDFTOTEXT_FALLBACK = True
 PDFTOTEXT_TIMEOUT_SECONDS = 6
 ENABLE_OCR = False
+
+#endregion
+
+#region extension-options
+
+def option_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def option_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def configure_extension(options):
+    global MAX_PAGES_TO_READ
+    global MIN_TEXT_CHARS
+    global SENSITIVE_OVERRIDE
+    global ROUTE_LOW_CONFIDENCE
+    global ENABLE_PDFTOTEXT_FALLBACK
+    global PDFTOTEXT_TIMEOUT_SECONDS
+    global ENABLE_OCR
+
+    options = options or {}
+
+    MAX_PAGES_TO_READ = option_int(options.get("max_pages_to_read"), MAX_PAGES_TO_READ)
+    MIN_TEXT_CHARS = option_int(options.get("min_text_chars"), MIN_TEXT_CHARS)
+    SENSITIVE_OVERRIDE = option_bool(options.get("sensitive_override"), SENSITIVE_OVERRIDE)
+    ROUTE_LOW_CONFIDENCE = option_bool(options.get("route_low_confidence"), ROUTE_LOW_CONFIDENCE)
+    ENABLE_PDFTOTEXT_FALLBACK = option_bool(options.get("enable_pdftotext_fallback"), ENABLE_PDFTOTEXT_FALLBACK)
+    PDFTOTEXT_TIMEOUT_SECONDS = option_int(options.get("pdftotext_timeout_seconds"), PDFTOTEXT_TIMEOUT_SECONDS)
+    ENABLE_OCR = option_bool(options.get("enable_ocr"), ENABLE_OCR)
 
 #endregion
 

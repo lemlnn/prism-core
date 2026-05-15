@@ -2,7 +2,7 @@
 
 #region extension-metadata
 
-EXTENSION_NAME = "metadata-image-sorter-v1.2"
+EXTENSION_NAME = "metadata-image-sorter-v1.3"
 EXTENSION_PRIORITY = 80
 
 #endregion
@@ -113,6 +113,45 @@ KNOWN_DATE_FORMATS = (
 EXIFTOOL_TIMEOUT_SECONDS = 10
 EXIFTOOL_PATH = shutil.which("exiftool")
 
+PREFER_FILESYSTEM_CREATED = False
+FALLBACK_TO_MODIFIED = True
+USE_EXIFTOOL = True
+FOLDER_FORMAT = "year/month"
+
+#endregion
+
+#region extension-options
+
+def option_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def option_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def configure_extension(options):
+    global EXIFTOOL_TIMEOUT_SECONDS
+    global PREFER_FILESYSTEM_CREATED
+    global FALLBACK_TO_MODIFIED
+    global USE_EXIFTOOL
+    global FOLDER_FORMAT
+
+    options = options or {}
+
+    EXIFTOOL_TIMEOUT_SECONDS = option_int(options.get("exiftool_timeout_seconds"), EXIFTOOL_TIMEOUT_SECONDS)
+    PREFER_FILESYSTEM_CREATED = option_bool(options.get("prefer_filesystem_created"), PREFER_FILESYSTEM_CREATED)
+    FALLBACK_TO_MODIFIED = option_bool(options.get("fallback_to_modified"), FALLBACK_TO_MODIFIED)
+    USE_EXIFTOOL = option_bool(options.get("use_exiftool"), USE_EXIFTOOL)
+    FOLDER_FORMAT = str(options.get("folder_format", FOLDER_FORMAT)).strip().lower()
+
 #endregion
 
 #region prism-hooks
@@ -127,13 +166,14 @@ def file_target_resolve(context): #PRISM hook to suggest media folders using met
 
     year = best_date.strftime("%Y")
     month = best_date.strftime("%m")
+    date_folder = build_date_folder(year, month)
 
     if ext in VIDEO_EXTENSIONS:
-        category = f"Videos/{year}/{month}"
+        category = f"Videos/{date_folder}"
     elif ext in RAW_EXTENSIONS:
-        category = f"Images/RAW/{year}/{month}"
+        category = f"Images/RAW/{date_folder}"
     else:
-        category = f"Images/{year}/{month}"
+        category = f"Images/{date_folder}"
 
     return {
         "category": category,
@@ -144,36 +184,45 @@ def file_target_resolve(context): #PRISM hook to suggest media folders using met
 
 #region media-date-resolution
 
+def build_date_folder(year, month):
+    if FOLDER_FORMAT == "year-month":
+        return f"{year}-{month}"
+    if FOLDER_FORMAT == "year_month":
+        return f"{year}_{month}"
+    return f"{year}/{month}"
+
+
 def get_best_media_datetime(path): #chooses the best available date source for a media file
     ext = path.suffix.lower()
 
-    if ext in RAW_EXTENSIONS:
-        exiftool_dt = get_exiftool_datetime(path)
+    if PREFER_FILESYSTEM_CREATED:
+        created_dt = get_created_datetime(path)
+        if created_dt is not None:
+            return created_dt, "created"
 
+    if USE_EXIFTOOL and ext in RAW_EXTENSIONS:
+        exiftool_dt = get_exiftool_datetime(path)
         if exiftool_dt is not None:
             return exiftool_dt, "metadata-exiftool"
 
     if ext in PHOTO_EXTENSIONS:
         pillow_dt = get_pillow_metadata_datetime(path)
-
         if pillow_dt is not None:
             return pillow_dt, "metadata-pillow"
 
-    if ext not in RAW_EXTENSIONS:
+    if USE_EXIFTOOL and ext not in RAW_EXTENSIONS:
         exiftool_dt = get_exiftool_datetime(path)
-
         if exiftool_dt is not None:
             return exiftool_dt, "metadata-exiftool"
 
     created_dt = get_created_datetime(path)
-
     if created_dt is not None:
         return created_dt, "created"
 
-    modified_dt = get_modified_datetime(path)
-
-    if modified_dt is not None:
-        return modified_dt, "modified"
+    if FALLBACK_TO_MODIFIED:
+        modified_dt = get_modified_datetime(path)
+        if modified_dt is not None:
+            return modified_dt, "modified"
 
     return datetime.now(), "current-time"
 
