@@ -63,6 +63,37 @@ Notes:
 - development build
 - intended as a structure/refactor checkpoint before additional v1.3.0 features
 
+## PRISM [v1.3.0-devt4a] (5/7/26)
+
+Pre-split architecture development build.
+
+Added:
+
+- `FileEntryService` for top-level file collection
+- `FileClassificationService` for extension/category classification and skip checks
+- `FileProcessResolver` for extension-based process/skip decisions
+- `FilePathService` for duplicate-safe paths, movement, relative display paths, and empty-folder cleanup
+- `FileTargetResolver` for final target path resolution after extension suggestions
+- `FileSystemService` as a central coordination layer for organize and undo behavior
+- clearer internal boundaries between file collection, classification, path handling, extension decisions, and file movement
+
+Changed:
+
+- organize and undo now route more behavior through the filesystem service layer
+- extension skip behavior is handled through `file_should_process`
+- extension target routing is handled through `file_target_resolve`
+- core still owns safe path validation, duplicate-safe naming, file movement, logs, and undo
+- internal structure is cleaner before the package split
+- debug and dry-run behavior remain aligned with the previous extension workflow
+
+Notes:
+
+- development build
+- likely one of the final major single-file dev builds
+- mostly architectural/internal
+- extension API is still experimental
+- prepares PRISM for the `devt4b` package split
+  
 ## PRISM [v1.3.0-devt3a] (5/6/26)
 
 Extension usability and CLI output polish release.
