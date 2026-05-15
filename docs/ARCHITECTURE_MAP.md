@@ -9,10 +9,43 @@ PRISM is a layered Python CLI tool with these main concerns:
 - app-level command routing
 - filesystem behavior
 - extension loading and hook dispatch
+- config editing
+- per-extension controls
 - organize/undo coordination
 - logging
 
-As of `v1.3.0-devt3a`, PRISM has entered the first experimental extension-system stage.
+As of `v1.3.0-devt4c`, PRISM has entered a split-package development stage with experimental per-extension config controls.
+
+## Package Layout
+
+Current split-package layout:
+
+```text
+src/prism/
+├── __init__.py
+├── __main__.py
+├── cli.py
+├── commands.py
+├── config_edit.py
+├── config_store.py
+├── defaults.py
+├── extensions.py
+├── filesystem.py
+├── logs.py
+└── main.py
+```
+
+Main responsibilities:
+
+- `defaults.py` owns default config and runtime config models.
+- `cli.py` owns argparse command definitions.
+- `main.py` owns the top-level runtime route.
+- `commands.py` owns high-level command handlers and organize/undo flows.
+- `config_store.py` owns config loading, saving, serialization, normalization, and status output.
+- `config_edit.py` owns controlled profile editing and extension config mutations.
+- `extensions.py` owns extension models, safety, loading, option injection, and hook dispatch.
+- `filesystem.py` owns file collection, classification, skip logic, path resolution, and movement helpers.
+- `logs.py` owns run logs, log lookup, log summaries, and log loading/saving.
 
 ## Runtime Objects
 
@@ -28,6 +61,8 @@ It includes:
 - working folder
 - config directory
 - extension settings
+- disabled extension filters
+- per-extension options
 - behavior defaults
 - default file-type routing
 
@@ -59,8 +94,8 @@ Responsible for:
 
 Main entry points:
 
-- `parse_args()`
-- `main()`
+- `parse_args()` in `cli.py`
+- `main()` in `main.py`
 
 This layer answers:
 
@@ -71,48 +106,75 @@ This layer answers:
 Responsible for:
 
 - loading profile JSON
+- normalizing config values
 - building runtime config
 - serializing config
 - saving profiles
 - resetting profiles
 - showing config status
 
-Main functions:
-
-- `load_config()`
-- `build_runtime_config()`
-- `write_config()`
-- `write_default_config()`
-- `serialize_config()`
-- `show_config_status()`
+Main functions live in `config_store.py`.
 
 This layer answers:
 
 > What runtime state should PRISM use?
 
-## 3. App Layer
+## 3. Config Edit Layer
 
-The app layer currently exists as `PrismApp`.
+Responsible for:
+
+- parsing `KEY=VALUE` config edits
+- validating editable config keys
+- coercing values into booleans, paths, lists, dictionaries, or strings
+- resetting selected keys to defaults
+- adding/removing disabled extensions
+- setting/removing per-extension options
+
+Main file:
+
+- `config_edit.py`
+
+Main config edit features:
+
+- `config --set KEY=VALUE [KEY=VALUE ...]`
+- `config --unset KEY [KEY ...]`
+- `extension --enable NAME`
+- `extension --disable NAME`
+- `extension --set-option NAME KEY=VALUE`
+- `extension --unset-option NAME KEY`
+
+This layer answers:
+
+> How should PRISM safely mutate saved profile data?
+
+## 4. App / Command Layer
+
+The app layer currently exists mainly through command handlers in `commands.py`.
 
 Responsible for:
 
 - high-level config command handling
-- config action routing
-- keeping config command logic out of `main()`
+- high-level extension command handling
+- organize command coordination
+- undo command coordination
+- keeping CLI parsing separate from behavior
 
 Main class:
 
 - `PrismApp`
 
-Main method:
+Main methods:
 
 - `handle_config_command()`
+- `handle_extension_command()`
+- `show_extension_status()`
+- `list_extensions()`
 
 This layer answers:
 
 > How should high-level application commands be handled?
 
-## 4. Extension Layer
+## 5. Extension Layer
 
 The extension layer is experimental.
 
@@ -120,9 +182,15 @@ Responsible for:
 
 - loading local `.py` extension files
 - skipping files that start with `_`
+- skipping extensions listed in `disabled_extensions`
 - ordering extensions by priority
+- passing configured options into loaded extensions
 - calling supported hooks safely
 - validating extension suggestions before core uses them
+
+Main file:
+
+- `extensions.py`
 
 Main classes:
 
@@ -141,11 +209,16 @@ Main models:
 - `FileTargetContext`
 - `TargetSuggestion`
 
+Option delivery:
+
+- `PRISM_EXTENSION_OPTIONS`
+- optional `configure_extension(options)`
+
 This layer answers:
 
 > What optional behavior have extensions suggested, and is it safe enough for core to use?
 
-## 5. Filesystem / Behavior Layer
+## 6. Filesystem / Behavior Layer
 
 Responsible for:
 
@@ -157,6 +230,10 @@ Responsible for:
 - generating duplicate-safe names
 - moving files
 - deleting empty folders after undo
+
+Main file:
+
+- `filesystem.py`
 
 Main classes:
 
@@ -171,11 +248,11 @@ This layer answers:
 
 > How should file-level behavior work?
 
-## 6. Top-Level Operation Layer
+## 7. Top-Level Operation Layer
 
 Responsible for coordinating user-visible flows.
 
-Main functions:
+Main functions in `commands.py`:
 
 - `organize_files()`
 - `undo_recent_organize()`
@@ -186,7 +263,7 @@ This layer answers:
 
 > How do organize and undo execute from start to finish?
 
-## 7. Logging Layer
+## 8. Logging Layer
 
 Responsible for:
 
@@ -196,6 +273,11 @@ Responsible for:
 - loading run logs
 - finding the latest log
 - listing logs
+- inspecting log summaries
+
+Main file:
+
+- `logs.py`
 
 Main functions:
 
@@ -204,7 +286,9 @@ Main functions:
 - `save_log()`
 - `load_log()`
 - `get_latest_log()`
+- `get_specified_log()`
 - `list_logs()`
+- `inspect_logs()`
 
 This layer answers:
 
@@ -246,7 +330,21 @@ This layer answers:
 3. `load_config()` loads profile data if it exists.
 4. `build_runtime_config()` applies CLI overrides.
 5. `PrismApp.handle_config_command()` routes the config action.
-6. The profile is created, saved, listed, shown, reset, or deleted.
+6. The profile is created, saved, listed, shown, reset, deleted, edited, or partially unset.
+
+For `config --set`, PRISM:
+
+1. builds editable config data from the current runtime config
+2. parses each `KEY=VALUE` assignment
+3. validates supported keys
+4. coerces values into safe Python/JSON values
+5. writes the updated profile JSON
+
+For `config --unset`, PRISM:
+
+1. builds editable config data from the current runtime config
+2. resets selected keys back to their default values
+3. writes the updated profile JSON
 
 ## Extension Flow
 
@@ -257,7 +355,12 @@ This layer answers:
 5. `PrismApp.handle_extension_command()` routes the extension action.
 6. `extension --create` creates the configured extension directory.
 7. `extension --status` shows extension settings and loaded extension details.
-8. If extensions are enabled, `ExtensionManager` loads extension modules for inspection.
+8. `extension --list` scans/displays discovered extensions and status.
+9. `extension --disable NAME` adds the name to `disabled_extensions`.
+10. `extension --enable NAME` removes the name from `disabled_extensions`.
+11. `extension --set-option NAME KEY=VALUE` writes into `extension_options`.
+12. `extension --unset-option NAME KEY` removes a stored option.
+13. If extensions are enabled, `ExtensionManager` loads extension modules for inspection or organize behavior.
 
 ## Current Boundaries
 
@@ -265,6 +368,7 @@ PRISM currently follows these boundaries:
 
 - CLI parsing should not own file behavior.
 - Config loading should not own organize/undo flow.
+- Config editing should mutate saved profile data through controlled helpers.
 - App command handling should not directly implement filesystem behavior.
 - Filesystem behavior should not own CLI parsing.
 - Extensions should suggest behavior, not directly control core safety.
@@ -277,6 +381,10 @@ Extensions may suggest:
 
 - whether a file should be processed
 - what category a file should route to
+
+Extensions may receive:
+
+- per-extension options from config
 
 Extensions should not own:
 
@@ -309,7 +417,7 @@ empty string
 
 ## Current Focus Areas
 
-The current milestone is stabilizing the experimental extension system.
+The current milestone is stabilizing the experimental extension system after the split-package refactor.
 
 Current extension surface:
 
@@ -319,13 +427,16 @@ Current extension surface:
 - process/skip suggestions
 - target-folder suggestions
 - safe category validation
+- disabled extension filters
+- per-extension option storage
+- option injection into loaded modules
 
 Sensitive areas:
 
 - keeping core-owned safety boundaries clear
 - deciding which hooks become stable public API
 - preventing extensions from bypassing path safety
-- deciding how extension settings should be represented
+- deciding how extension settings should be represented long-term
 - keeping logs reliable when extensions influence routing
 - preparing the extension model for future TUI/GUI use
 
@@ -335,8 +446,19 @@ Before the extension API becomes stable, this update still needs to resolve thes
 
 - how many hooks belong in the first stable API
 - whether extensions should only suggest behavior or also add commands
-- how extension-defined settings should be stored
+- whether extension-defined settings need schemas/manifests
 - whether extension metadata should use a manifest file
 - how extension conflicts should be reported
 - how a TUI/GUI should display extension options
 - how much of the context model should become public API
+
+## Next Architecture Target
+
+The likely next major architecture target is a planner pipeline for TUI support:
+
+```text
+plan_organize()
+execute_plan()
+```
+
+That would let CLI, dry-run, and TUI share the same backend instead of duplicating organize behavior.

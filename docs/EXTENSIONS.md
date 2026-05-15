@@ -2,7 +2,7 @@
 
 ## Status
 
-The PRISM extension system is experimental as of `v1.3.0-devt3a`.
+The PRISM extension system is experimental as of `v1.3.0-devt4c`.
 
 Extensions are disabled by default. The API may change or be added to before the stable v1.3.x release.
 
@@ -59,6 +59,74 @@ Default extension directory:
 ~/.prism_extensions
 ```
 
+## Extension Management Commands
+
+Show loaded extension status:
+
+```bash
+prism --enable-extensions extension --status
+```
+
+List discovered extensions and show enabled/disabled state:
+
+```bash
+prism --enable-extensions extension --list
+```
+
+Disable one extension in the current config profile:
+
+```bash
+prism extension --disable pdf-classifier-APs-v1.0
+```
+
+Enable it again:
+
+```bash
+prism extension --enable pdf-classifier-APs-v1.0
+```
+
+Set a per-extension option:
+
+```bash
+prism extension --set-option metadata-image-sorter-v1.2 prefer_filesystem_created=true
+```
+
+Remove a per-extension option:
+
+```bash
+prism extension --unset-option metadata-image-sorter-v1.2 prefer_filesystem_created
+```
+
+Named profiles work with extension commands too:
+
+```bash
+prism -c photography extension --disable pdf-classifier-APs-v1.0
+prism -c photography extension --set-option metadata-image-sorter-v1.2 folder_format=year/month
+```
+
+## Config Fields
+
+`v1.3.0-devt4c` adds these extension-related config fields:
+
+```json
+{
+  "enable_extensions": true,
+  "extensions_dir_path": "/path/to/extensions",
+  "disabled_extensions": [
+    "pdf-classifier-APs-v1.0"
+  ],
+  "extension_options": {
+    "metadata-image-sorter-v1.2": {
+      "prefer_filesystem_created": true
+    }
+  }
+}
+```
+
+`disabled_extensions` can match an extension by declared `EXTENSION_NAME`, module name, file stem, or file name.
+
+`extension_options` stores option dictionaries by extension name. PRISM stores and passes these options, but each extension decides whether to use them.
+
 ## Extension Loading
 
 PRISM loads `.py` files from the selected extension directory.
@@ -74,6 +142,8 @@ Example:
 
 Files starting with `_` are ignored.
 
+Disabled extensions are skipped before or after import, depending on whether PRISM can match the file/module name before loading.
+
 If an extension fails to load, PRISM prints a warning and continues.
 
 ## Extension Metadata
@@ -85,7 +155,7 @@ EXTENSION_NAME = "MyExtension"
 EXTENSION_PRIORITY = 50
 ```
 
-`EXTENSION_NAME` is used in debug output and warnings.
+`EXTENSION_NAME` is used in debug output, warnings, disable/enable config matching, and option lookup.
 
 `EXTENSION_PRIORITY` controls hook order. Higher priority runs first.
 
@@ -98,9 +168,53 @@ Suggested priority ranges:
 - `10` = expanded file type packs
 - `0` = default
 
+## Per-Extension Options
+
+When PRISM loads an extension, it attaches configured options to the module as:
+
+```python
+PRISM_EXTENSION_OPTIONS
+```
+
+Example extension usage:
+
+```python
+EXTENSION_NAME = "ExampleOptionExtension"
+EXTENSION_PRIORITY = 50
+
+
+def file_target_resolve(context):
+    options = globals().get("PRISM_EXTENSION_OPTIONS", {})
+    target_folder = options.get("target_folder", "Documents/Examples")
+
+    if context.extension == ".example":
+        return {
+            "category": target_folder,
+            "reason": "example extension option"
+        }
+
+    return None
+```
+
+Extensions may also define an optional configuration hook:
+
+```python
+EXTENSION_NAME = "ExampleConfiguredExtension"
+EXTENSION_PRIORITY = 50
+
+OPTIONS = {}
+
+
+def configure_extension(options):
+    global OPTIONS
+    OPTIONS = dict(options)
+```
+
+PRISM calls `configure_extension(options)` after loading the module and before hook execution.
+
 ## Current Hooks
 
-`v1.3.0-devt3a` supports two hooks:
+`v1.3.0-devt4c` supports two hooks:
 
 - `file_should_process`
 - `file_target_resolve`
@@ -116,6 +230,7 @@ Example:
 ```python
 EXTENSION_NAME = "TempFileSkipper"
 EXTENSION_PRIORITY = 90
+
 
 def file_should_process(context):
     if context.file_name.endswith(".tmp"):
@@ -167,6 +282,7 @@ Example:
 ```python
 EXTENSION_NAME = "MarkdownSorter"
 EXTENSION_PRIORITY = 50
+
 
 def file_target_resolve(context):
     if context.extension == ".md":
@@ -262,6 +378,8 @@ Debug output can show:
 
 - extension load order
 - extension priority
+- disabled extension skips
+- applied option visibility in status output
 - extension skip suggestions
 - extension target suggestions
 - invalid suggestion warnings
@@ -273,8 +391,15 @@ Debug output can show:
 EXTENSION_NAME = "ExampleExtension"
 EXTENSION_PRIORITY = 50
 
+
+def configure_extension(options):
+    # Optional. Only needed if this extension supports user options.
+    pass
+
+
 def file_should_process(context):
     return None
+
 
 def file_target_resolve(context):
     return None
@@ -285,6 +410,7 @@ def file_target_resolve(context):
 ```python
 EXTENSION_NAME = "MarkdownSorter"
 EXTENSION_PRIORITY = 50
+
 
 def file_target_resolve(context):
     if context.extension == ".md":
@@ -301,6 +427,7 @@ def file_target_resolve(context):
 ```python
 EXTENSION_NAME = "TempFileSkipper"
 EXTENSION_PRIORITY = 90
+
 
 def file_should_process(context):
     if context.file_name.endswith(".tmp"):
@@ -321,5 +448,6 @@ Expected future work:
 - more hooks
 - better examples
 - possible extension manifests
-- extension-defined settings
-- stronger extension documentation
+- stronger option schemas
+- better extension conflict reporting
+- TUI display of extension options

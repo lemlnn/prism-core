@@ -11,8 +11,11 @@ It can:
 - save JSON run logs
 - undo previous organize runs
 - use persistent config profiles
+- edit config profiles from the CLI
 - show debug output
 - run experimental extensions
+- enable/disable individual extensions
+- store per-extension options
 
 PRISM works from the current working directory unless the saved config says otherwise.
 
@@ -27,6 +30,8 @@ PRISM resolves settings in this order:
 CLI flags temporarily override profile values.
 
 Use `config --save` when you want the current runtime settings written back into the selected profile.
+
+Use `config --set` or `config --unset` when you want to directly edit saved profile values.
 
 ## Basic Commands
 
@@ -78,10 +83,10 @@ Run with debug output:
 prism --debug-mode organize
 ```
 
-If you are running the development script directly, replace `prism` with:
+If you are running the split source package directly, use:
 
 ```bash
-python PRISM-v1.3.0-devt3a.py
+python -m prism
 ```
 
 ## Organize
@@ -279,10 +284,66 @@ Common saved settings include:
 - `delete_empty_folders`
 - `enable_extensions`
 - `extensions_dir_path`
+- `disabled_extensions`
+- `extension_options`
+
+## Editing Config Values
+
+`v1.3.0-devt4c` adds direct config editing.
+
+Set one value:
+
+```bash
+prism config --set sort_hidden=true
+```
+
+Set multiple values:
+
+```bash
+prism -c photography config --set enable_extensions=true extensions_dir_path=./extensions
+```
+
+Unset a value back to default:
+
+```bash
+prism config --unset sort_hidden
+```
+
+Unset multiple values:
+
+```bash
+prism config --unset exclude_str dry_run
+```
+
+Examples:
+
+```bash
+prism config --set dry_run=true
+prism config --set exclude_str=Draft
+prism config --set folder_path=./Downloads
+prism config --set enable_extensions=true
+```
+
+Supported editable keys include:
+
+- `debug_mode`
+- `script_name`
+- `log_dir_name`
+- `folder_path`
+- `config_dir_path`
+- `enable_extensions`
+- `extensions_dir_path`
+- `dry_run`
+- `sort_hidden`
+- `delete_empty_folders`
+- `exclude_str`
+- `default_file_types`
+- `disabled_extensions`
+- `extension_options`
 
 ## Experimental Extensions
 
-`v1.3.0-devt3a` continues the experimental extension framework.
+`v1.3.0-devt4c` continues the experimental extension framework.
 
 Extensions are disabled by default.
 
@@ -328,6 +389,12 @@ Inspect loaded extensions from a custom directory:
 prism --enable-extensions --extensions-dir ./extensions extension --status
 ```
 
+List discovered extensions:
+
+```bash
+prism --enable-extensions extension --list
+```
+
 Save extension settings into a profile:
 
 ```bash
@@ -346,6 +413,56 @@ Current hooks:
 - `file_target_resolve`
 
 See the Extension Guide for hook details and examples.
+
+## Per-Extension Controls
+
+Disable an extension in the current config:
+
+```bash
+prism extension --disable pdf-classifier-APs-v1.0
+```
+
+Enable it again:
+
+```bash
+prism extension --enable pdf-classifier-APs-v1.0
+```
+
+Set a per-extension option:
+
+```bash
+prism extension --set-option metadata-image-sorter-v1.2 prefer_filesystem_created=true
+```
+
+Remove a per-extension option:
+
+```bash
+prism extension --unset-option metadata-image-sorter-v1.2 prefer_filesystem_created
+```
+
+Use a named profile:
+
+```bash
+prism -c photography extension --disable pdf-classifier-APs-v1.0
+prism -c photography extension --set-option metadata-image-sorter-v1.2 folder_format=year/month
+```
+
+Stored config example:
+
+```json
+{
+  "disabled_extensions": [
+    "pdf-classifier-APs-v1.0"
+  ],
+  "extension_options": {
+    "metadata-image-sorter-v1.2": {
+      "prefer_filesystem_created": true
+    }
+  }
+}
+```
+
+PRISM stores extension options and passes them to loaded extensions. An extension must read `PRISM_EXTENSION_OPTIONS` or implement `configure_extension(options)` before those options affect behavior.
 
 ## Debugging
 
@@ -370,6 +487,8 @@ Debug output can show:
 - missing moved files
 - restore target paths
 - extension loading order
+- disabled extension skips
+- extension options in status output
 - extension skip or target suggestions
 
 ## Example Workflows
@@ -387,13 +506,22 @@ prism organize
 ```bash
 prism -c photography config --create
 prism -c photography config --save --dry-run --exclude-str "Draft"
+prism -c photography config --set enable_extensions=true extensions_dir_path=./extensions
 prism -c photography organize
 ```
 
 ### Extension Test Run
 
 ```bash
-prism --debug-mode --extensions-enabled --extensions-dir ./extensions organize --dry-run
+prism --debug-mode --enable-extensions --extensions-dir ./extensions organize --dry-run
+```
+
+### Disable a Specific Extension
+
+```bash
+prism extension --disable pdf-classifier-APs-v1.0
+prism --enable-extensions extension --list
+prism --enable-extensions organize --dry-run
 ```
 
 ### Safe Undo
