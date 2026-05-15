@@ -19,7 +19,7 @@ class DefaultConfig: #hardcoded default settings
 
     debug_mode: bool = False
     script_name: str = "prism"
-    script_version: str = "1.3.0p-devt4c"
+    script_version: str = "1.3.0-devt4c"
     log_dir_name: str = ".prism_logs"
     folder_path: Path = field(default_factory=Path.cwd)
     config_dir_path: Path = Path.home() / ".prism_config"
