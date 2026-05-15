@@ -279,6 +279,7 @@ The main design boundary is still the same: extensions suggest behavior, while P
 - Windows 10/11 (restricted, unrestricted)
 - Fedora KDE 42/43
 - EndeavorOS
+- MacOS (beta)
 
 ## Credits
 
@@ -293,7 +294,7 @@ Alpha Testers:
 
 - Bella - beta macOS compatibility attempt
 - Gavin ([@dojozycknar10-player](https://github.com/dojozycknar10-player)) - Windows 11 restricted environment compatibility
-- Maxwell ([@b135-crypto](https://github.com/b135-crypto)) - planned Zorin OS and macOS compatibility
+- Chenqi ([@anthonylolsun](https://github.com/anthonylolsun)) - macOS compatibility (beta)
 
 Early Contributors:
 
