@@ -255,10 +255,10 @@ Per-extension options are stored in the selected config profile under `extension
 
 ## Development Build Notes
 
-The current split package structure is organized under `src/prism/`:
+The current split package structure is organized under `src/prism_core/`:
 
 ```text
-src/prism/
+src/prism_core/
   __init__.py
   __main__.py
   defaults.py
